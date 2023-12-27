@@ -1,5 +1,6 @@
-package com.sdu.data.parquet;
+package com.sdu.data.parquet.writer;
 
+import com.sdu.data.parquet.RowData;
 import com.sdu.data.type.RowType;
 import com.sdu.data.type.Type;
 import org.apache.parquet.io.api.Binary;
