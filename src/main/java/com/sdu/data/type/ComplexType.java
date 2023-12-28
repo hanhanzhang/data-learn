@@ -1,18 +1,18 @@
 package com.sdu.data.type;
 
-public class BasicType implements Type {
+public class ComplexType implements Type {
 
     private final boolean nullable;
-    private final LogicalType type;
+    private final LogicalType logicalType;
 
-    public BasicType(boolean nullable, LogicalType type) {
+    public ComplexType(boolean nullable, LogicalType logicalType) {
         this.nullable = nullable;
-        this.type = type;
+        this.logicalType = logicalType;
     }
 
     @Override
     public boolean isPrimary() {
-        return true;
+        return false;
     }
 
     @Override
@@ -22,6 +22,6 @@ public class BasicType implements Type {
 
     @Override
     public LogicalType type() {
-        return type;
+        return logicalType;
     }
 }

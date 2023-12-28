@@ -4,35 +4,35 @@ public class Types {
 
     private Types() { }
 
-    public static IntType intType() {
-        return IntType.INT_TYPE;
+    public static IntType intType(boolean nullable) {
+        return nullable ? IntType.NULLABLE_INT : IntType.NOTNULL_INT;
     }
 
-    public static FloatType floatType() {
-        return FloatType.FLOAT_TYPE;
+    public static FloatType floatType(boolean nullable) {
+        return nullable ? FloatType.NULLABLE_FLOAT : FloatType.NOTNULL_FLOAT;
     }
 
-    public static DoubleType doubleType() {
-        return DoubleType.DOUBLE_TYPE;
+    public static DoubleType doubleType(boolean nullable) {
+        return nullable ? DoubleType.NULLABLE_DOUBLE : DoubleType.NOTNULL_DOUBLE;
     }
 
-    public static BooleanType booleanType() {
-        return BooleanType.BOOLEAN_TYPE;
+    public static BooleanType booleanType(boolean nullable) {
+        return nullable ? BooleanType.NULLABLE_BOOLEAN : BooleanType.NOTNULL_BOOLEAN;
     }
 
-    public static StringType stringType() {
-        return StringType.STRING_TYPE;
+    public static StringType stringType(boolean nullable) {
+        return nullable ? StringType.NULLABLE_STRING : StringType.NOTNULL_STRING;
     }
 
-    public static MapType mapType(Type keyType, Type valueType) {
-        return new MapType(keyType, valueType);
+    public static MapType mapType(boolean nullable, Type keyType, Type valueType) {
+        return new MapType(nullable, keyType, valueType);
     }
 
-    public static ListType listType(Type elementType) {
-        return new ListType(elementType);
+    public static ListType listType(boolean nullable, Type elementType) {
+        return new ListType(nullable, elementType);
     }
 
-    public static RowType rowType(String[] fieldNames, Type[] fieldTypes) {
-        return new RowType(fieldNames, fieldTypes);
+    public static RowType rowType(boolean nullable, String[] fieldNames, Type[] fieldTypes) {
+        return new RowType(nullable, fieldNames, fieldTypes);
     }
 }

@@ -4,6 +4,8 @@ public interface Type {
 
     boolean isPrimary();
 
-    TypeEnum type();
+    boolean isNullable();
+
+    LogicalType type();
 
 }

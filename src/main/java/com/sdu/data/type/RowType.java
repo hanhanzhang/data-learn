@@ -2,12 +2,13 @@ package com.sdu.data.type;
 
 import com.google.common.base.Preconditions;
 
-public class RowType implements Type {
+public class RowType extends ComplexType {
 
     private final String[] filedNames;
     private final Type[] fieldTypes;
 
-    public RowType(String[] filedNames, Type[] fieldTypes) {
+    public RowType(boolean nullable, String[] filedNames, Type[] fieldTypes) {
+        super(nullable, LogicalType.ROW);
         Preconditions.checkNotNull(filedNames);
         Preconditions.checkNotNull(fieldTypes);
         Preconditions.checkArgument(fieldTypes.length == filedNames.length);
@@ -30,13 +31,4 @@ public class RowType implements Type {
         return filedNames.length;
     }
 
-    @Override
-    public boolean isPrimary() {
-        return false;
-    }
-
-    @Override
-    public TypeEnum type() {
-        return TypeEnum.ROW;
-    }
 }

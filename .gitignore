@@ -11,4 +11,3 @@ gen/
 *.ipr
 *.iws
 .idea/
-src/test/

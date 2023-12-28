@@ -1,22 +1,17 @@
 package com.sdu.data.parquet.writer;
 
-import static com.sdu.data.parquet.ParquetSchemas.ARRAY_ELEMENT_NAME;
-import static com.sdu.data.parquet.ParquetSchemas.ARRAY_NAME;
-import static com.sdu.data.parquet.ParquetSchemas.MAP_KEY_NAME;
-import static com.sdu.data.parquet.ParquetSchemas.MAP_NAME;
-import static com.sdu.data.parquet.ParquetSchemas.MAP_VALUE_NAME;
-
-import java.io.Serializable;
-import java.util.Map;
-
-import org.apache.parquet.io.api.Binary;
-import org.apache.parquet.io.api.RecordConsumer;
-
 import com.sdu.data.parquet.RowData;
 import com.sdu.data.type.ListType;
 import com.sdu.data.type.MapType;
 import com.sdu.data.type.RowType;
 import com.sdu.data.type.Type;
+import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.io.api.RecordConsumer;
+
+import java.io.Serializable;
+import java.util.Map;
+
+import static com.sdu.data.parquet.ParquetSchemas.*;
 
 public class RowDataParquetWriter {
 
@@ -31,11 +26,13 @@ public class RowDataParquetWriter {
     public void writeRow(RowData rowData) {
         recordConsumer.startMessage();
         for (int i = 0; i < rowData.getFieldCount(); ++i) {
-            Object fieldValue = rowData.getFieldValue(i);
-            String fieldName = rowData.getFieldName(i);
-            recordConsumer.startField(fieldName, i);
-            fieldWriters[i].write(recordConsumer, fieldValue);
-            recordConsumer.endField(fieldName, i);
+            if (!rowData.isNullAt(i)) {
+                Object fieldValue = rowData.getFieldValue(i);
+                String fieldName = rowData.getFieldName(i);
+                recordConsumer.startField(fieldName, i);
+                fieldWriters[i].write(recordConsumer, fieldValue);
+                recordConsumer.endField(fieldName, i);
+            }
         }
         recordConsumer.endMessage();
     }

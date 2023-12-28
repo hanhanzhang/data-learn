@@ -1,11 +1,12 @@
 package com.sdu.data.type;
 
-public class MapType implements Type {
+public class MapType extends ComplexType {
 
     private final Type keyType;
     private final Type valueType;
 
-    public MapType(Type keyType, Type valueType) {
+    public MapType(boolean nullable, Type keyType, Type valueType) {
+        super(nullable, LogicalType.MAP);
         this.keyType = keyType;
         this.valueType = valueType;
     }
@@ -16,15 +17,5 @@ public class MapType implements Type {
 
     public Type getValueType() {
         return valueType;
-    }
-
-    @Override
-    public boolean isPrimary() {
-        return false;
-    }
-
-    @Override
-    public TypeEnum type() {
-        return TypeEnum.MAP;
     }
 }
