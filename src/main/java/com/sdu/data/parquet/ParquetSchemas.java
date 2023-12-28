@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.parquet.schema.GroupType;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
@@ -35,6 +36,57 @@ public class ParquetSchemas {
         return new MessageType(ROW_MESSAGE, types);
     }
 
+    public static RowType convertRowType(MessageType messageType) {
+        int fieldCount = messageType.getFieldCount();
+        String[] fieldNames = new String[fieldCount];
+        com.sdu.data.type.Type[] fieldTypes = new com.sdu.data.type.Type[fieldCount];
+        for (int i = 0; i < fieldCount; ++i) {
+            Type type = messageType.getType(i);
+            fieldNames[i] = type.getName();
+            fieldTypes[i] = createType(type);
+        }
+        return new RowType(fieldNames, fieldTypes);
+    }
+
+    private static com.sdu.data.type.Type createType(Type type) {
+        if (type.isPrimitive()) {
+            return createBasicType(type.asPrimitiveType());
+        }
+        return createComplexType(type.asGroupType());
+    }
+
+    private static com.sdu.data.type.Type createBasicType(PrimitiveType type) {
+        switch (type.getPrimitiveTypeName()) {
+            case INT32:
+                return com.sdu.data.type.Types.intType();
+            case FLOAT:
+                return com.sdu.data.type.Types.floatType();
+            case DOUBLE:
+                return com.sdu.data.type.Types.doubleType();
+            case BINARY:
+                return com.sdu.data.type.Types.stringType();
+            case BOOLEAN:
+                return com.sdu.data.type.Types.booleanType();
+            default:
+                throw new UnsupportedOperationException("unsupported primary parquet type: " + type.getPrimitiveTypeName());
+        }
+    }
+
+    private static com.sdu.data.type.Type createComplexType(GroupType type) {
+        GroupType childrenType = type.getType(0).asGroupType();
+        switch (childrenType.getFieldCount()) {
+            case 1: // LIST
+                Type elementType = childrenType.getType(0);
+                return com.sdu.data.type.Types.listType(createType(elementType));
+            case 2: // MAP
+                Type keyType = childrenType.getType(0);
+                Type valueType = childrenType.getType(1);
+                return com.sdu.data.type.Types.mapType(createType(keyType), createType(valueType));
+            default:
+                throw new UnsupportedOperationException("unsupported primary parquet type: " + type);
+        }
+    }
+
     private static Type createParquetType(String name, com.sdu.data.type.Type type) {
         if (type.isPrimary()) {
             return createParquetPrimaryType(name, (BasicType) type);
@@ -55,6 +107,7 @@ public class ParquetSchemas {
                         .named(name);
             case STRING:
                 return Types.primitive(PrimitiveType.PrimitiveTypeName.BINARY, Type.Repetition.REQUIRED)
+                        .as(LogicalTypeAnnotation.StringLogicalTypeAnnotation.stringType())
                         .named(name);
             case BOOLEAN:
                 return Types.primitive(PrimitiveType.PrimitiveTypeName.BOOLEAN, Type.Repetition.REQUIRED)

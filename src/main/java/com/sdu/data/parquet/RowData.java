@@ -1,14 +1,21 @@
 package com.sdu.data.parquet;
 
+import java.io.Serializable;
+import java.util.Arrays;
+import java.util.List;
+
 import com.google.common.base.Preconditions;
 import com.sdu.data.type.RowType;
-
-import java.io.Serializable;
 
 public class RowData implements Serializable {
 
     private final RowType rowType;
     private final Object[] values;
+
+    public RowData(RowType rowType, int fieldCount) {
+        this.rowType = rowType;
+        this.values = new Object[fieldCount];
+    }
 
     public RowData(RowType rowType, Object[] values) {
         Preconditions.checkNotNull(rowType);
@@ -27,7 +34,20 @@ public class RowData implements Serializable {
         return values[index];
     }
 
+    public void setFieldValue(int index, Object value) {
+        Preconditions.checkArgument(index >= 0 && index < values.length);
+        values[index] = value;
+    }
+
     public String getFieldName(int index) {
         return rowType.getFieldName(index);
+    }
+
+    public RowType getRowType() {
+        return rowType;
+    }
+
+    public List<Object> toList() {
+        return Arrays.stream(values).toList();
     }
 }
