@@ -31,4 +31,8 @@ public class Types {
     public static ListType listType(Type elementType) {
         return new ListType(elementType);
     }
+
+    public static RowType rowType(String[] fieldNames, Type[] fieldTypes) {
+        return new RowType(fieldNames, fieldTypes);
+    }
 }

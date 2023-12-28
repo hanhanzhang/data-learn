@@ -119,6 +119,18 @@ public class RowDataParquetWriter {
                     consumer.endField(MAP_NAME, 0);
                     consumer.endGroup();
                 };
+            case ROW:
+                RowType rowType = (RowType) type;
+                FieldWriter[] fieldWriters = buildRowFieldWriter(rowType);
+                return (consumer, value) -> {
+                    RowData rowData = (RowData) value;
+                    for (int i = 0; i < rowType.getFieldCount(); ++i) {
+                        consumer.startField(rowType.getFieldName(i), i);
+                        fieldWriters[i].write(consumer, rowData.getFieldValue(i));
+                        consumer.endField(rowType.getFieldName(i), i);
+                    }
+                };
+
 
             default:
                 throw new UnsupportedOperationException("unsupported type: " + type.type());

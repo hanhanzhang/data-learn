@@ -143,6 +143,13 @@ public class ParquetSchemas {
                         .value(createParquetType(MAP_VALUE_NAME, mapType.getValueType()))
                         .named(name);
 
+            case ROW:
+                com.sdu.data.type.RowType rowType = (com.sdu.data.type.RowType) type;
+                Types.GroupBuilder<GroupType> builder = Types.buildGroup(Type.Repetition.OPTIONAL);
+                for (int i = 0; i < rowType.getFieldCount(); ++i) {
+                    builder.addField(createParquetType(rowType.getFieldName(i), rowType.getFieldType(i)));
+                }
+                return builder.named(name);
             default:
                 throw new UnsupportedOperationException("unsupported complex type: " + type.type());
         }

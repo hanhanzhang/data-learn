@@ -2,9 +2,7 @@ package com.sdu.data.type;
 
 import com.google.common.base.Preconditions;
 
-import java.io.Serializable;
-
-public class RowType implements Serializable {
+public class RowType implements Type {
 
     private final String[] filedNames;
     private final Type[] fieldTypes;
@@ -30,5 +28,15 @@ public class RowType implements Serializable {
 
     public int getFieldCount() {
         return filedNames.length;
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return false;
+    }
+
+    @Override
+    public TypeEnum type() {
+        return TypeEnum.ROW;
     }
 }
