@@ -137,6 +137,9 @@ public class ParquetSchemas {
             case LIST:
                 com.sdu.data.type.ListType listType = (com.sdu.data.type.ListType) type;
                 if (standardSchema) {
+                    // NOTE: 需要标记<name>是否可空, 若不空时是重复元素, repetition只能标记一种状态, 故:
+                    // 1. <list-repetition> 标记是否可空
+                    // 2. repeated group list 标记是重复元素
                     // <list-repetition> group <name> {
                     //   repeated group list {
                     //     <element-repetition> <element-type> element;
@@ -146,6 +149,7 @@ public class ParquetSchemas {
                             .element(createParquetType(ARRAY_ELEMENT_NAME, listType.getElementType(), true))
                             .named(name);
                 }
+                // NOTE: 这种情况无法标记是否可空(null 和 empty list是两种不同语义)
                 // repeated group <name> {
                 //     <element-repetition> <element-type> element;
                 // }
