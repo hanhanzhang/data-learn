@@ -14,11 +14,13 @@ public class RowDataWriteSupport extends WriteSupport<RowData> {
 
     private final RowType rowType;
     private final MessageType schema;
+    private final boolean standardSchema;
     private RowDataParquetWriter writer;
 
-    public RowDataWriteSupport(RowType rowType) {
+    public RowDataWriteSupport(RowType rowType, boolean standardSchema) {
         this.rowType = rowType;
-        this.schema = ParquetSchemas.convertParquetSchema(rowType);
+        this.standardSchema = standardSchema;
+        this.schema = ParquetSchemas.convertParquetSchema(rowType, standardSchema);
     }
 
     @Override
@@ -28,7 +30,7 @@ public class RowDataWriteSupport extends WriteSupport<RowData> {
 
     @Override
     public void prepareForWrite(RecordConsumer recordConsumer) {
-        this.writer = new RowDataParquetWriter(recordConsumer, rowType);
+        this.writer = new RowDataParquetWriter(standardSchema, recordConsumer, rowType);
     }
 
     @Override
