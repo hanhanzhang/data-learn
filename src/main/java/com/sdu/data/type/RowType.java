@@ -7,6 +7,10 @@ public class RowType extends ComplexType {
     private final String[] filedNames;
     private final Type[] fieldTypes;
 
+    public RowType(String[] filedNames, Type[] fieldTypes) {
+        this(false, filedNames, fieldTypes);
+    }
+
     public RowType(boolean nullable, String[] filedNames, Type[] fieldTypes) {
         super(nullable, LogicalType.ROW);
         Preconditions.checkNotNull(filedNames);
