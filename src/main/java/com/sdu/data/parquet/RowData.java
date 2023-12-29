@@ -1,8 +1,12 @@
 package com.sdu.data.parquet;
 
 import java.io.Serializable;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
 
 import com.google.common.base.Preconditions;
+import com.sdu.data.type.LogicalType;
 import com.sdu.data.type.RowType;
 
 public class RowData implements Serializable {
@@ -58,9 +62,39 @@ public class RowData implements Serializable {
                 sb.append(", ");
             }
             sb.append(getFieldName(i)).append(": ");
-            sb.append(getFieldValue(i));
+            sb.append(formatFieldValue(rowType.getFieldType(i).type(), getFieldValue(i)));
         }
         sb.append("}");
         return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String formatFieldValue(LogicalType type, Object value) {
+        switch (type) {
+            case INT:
+            case FLOAT:
+            case DOUBLE:
+            case STRING:
+            case BOOLEAN:
+                return String.valueOf(value);
+            case LIST:
+                return String.format("[%s]", StringUtils.join(((Object[]) value), ','));
+            case MAP:
+                StringBuilder sb = new StringBuilder("[");
+                int index = 0;
+                for (Map.Entry<Object, Object> entry : ((Map<Object, Object>) value).entrySet()) {
+                    if (index != 0) {
+                        sb.append(",");
+                    }
+                    sb.append("(").append(entry.getKey()).append(", ").append(entry.getValue()).append(")");
+                    index++;
+                }
+                sb.append("]");
+                return sb.toString();
+            case ROW:
+                return ((RowData) value).toString();
+            default:
+                throw new UnsupportedOperationException("unsupported type: " + type);
+        }
     }
 }
