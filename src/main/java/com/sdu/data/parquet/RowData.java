@@ -1,9 +1,9 @@
 package com.sdu.data.parquet;
 
+import java.io.Serializable;
+
 import com.google.common.base.Preconditions;
 import com.sdu.data.type.RowType;
-
-import java.io.Serializable;
 
 public class RowData implements Serializable {
 
@@ -50,4 +50,17 @@ public class RowData implements Serializable {
         return rowType;
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("{");
+        for (int i = 0; i < rowType.getFieldCount(); i++) {
+            if (i != 0) {
+                sb.append(", ");
+            }
+            sb.append(getFieldName(i)).append(": ");
+            sb.append(getFieldValue(i));
+        }
+        sb.append("}");
+        return sb.toString();
+    }
 }

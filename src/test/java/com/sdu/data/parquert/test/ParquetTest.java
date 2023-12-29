@@ -23,6 +23,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.sdu.data.parquet.RowData;
+import com.sdu.data.parquet.reader.RowDataReadSupport;
 import com.sdu.data.parquet.writer.RowDataWriteSupport;
 import com.sdu.data.type.RowType;
 import com.sdu.data.type.Type;
@@ -31,7 +32,8 @@ public class ParquetTest {
 
     private Path path;
     protected ParquetWriter<RowData> parquetWriter;
-    protected ParquetReader<GenericRecord> parquetReader;
+    protected ParquetReader<GenericRecord> avroRecordParquetReader;
+    protected ParquetReader<RowData> rowDataParquetReader;
 
     @Before
     public void setup() throws Exception {
@@ -160,14 +162,22 @@ public class ParquetTest {
     }
 
     @Test
-    public void testRead() throws Exception {
-        parquetReader = ParquetReader.<GenericRecord>builder(new AvroReadSupport<>(), path).build();
+    public void testAvroRead() throws Exception {
+        avroRecordParquetReader = ParquetReader.<GenericRecord>builder(new AvroReadSupport<>(), path).build();
 
         GenericRecord record;
-        while ((record = parquetReader.read()) != null) {
+        while ((record = avroRecordParquetReader.read()) != null) {
             System.out.println("read record: " + record);
         }
+    }
 
+    @Test
+    public void testRowDataRead() throws Exception {
+        rowDataParquetReader = ParquetReader.builder(new RowDataReadSupport(), path).build();
+        RowData record;
+        while ((record = rowDataParquetReader.read()) != null) {
+            System.out.println("read record: " + record);
+        }
     }
 
     private static void write(RowData[] rowData, ParquetWriter<RowData> parquetWriter) throws Exception {

@@ -1,11 +1,17 @@
 package com.sdu.data.parquet;
 
-import com.sdu.data.type.BasicType;
-import com.sdu.data.type.RowType;
-import org.apache.parquet.schema.*;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.parquet.schema.GroupType;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Type;
+import org.apache.parquet.schema.Types;
+
+import com.sdu.data.type.BasicType;
+import com.sdu.data.type.RowType;
 
 public class ParquetSchemas {
 
@@ -30,23 +36,23 @@ public class ParquetSchemas {
         return new MessageType(ROW_MESSAGE, types);
     }
 
-    public static RowType convertRowType(MessageType messageType) {
+    public static RowType convertRowType(MessageType messageType, boolean standardSchema) {
         int fieldCount = messageType.getFieldCount();
         String[] fieldNames = new String[fieldCount];
         com.sdu.data.type.Type[] fieldTypes = new com.sdu.data.type.Type[fieldCount];
         for (int i = 0; i < fieldCount; ++i) {
             Type type = messageType.getType(i);
             fieldNames[i] = type.getName();
-            fieldTypes[i] = createType(type);
+            fieldTypes[i] = createType(type, standardSchema);
         }
         return new RowType(false, fieldNames, fieldTypes);
     }
 
-    private static com.sdu.data.type.Type createType(Type type) {
+    private static com.sdu.data.type.Type createType(Type type, boolean standardSchema) {
         if (type.isPrimitive()) {
             return createBasicType(type.asPrimitiveType());
         }
-        return createComplexType(type.asGroupType());
+        return createComplexType(type.asGroupType(), standardSchema);
     }
 
     private static com.sdu.data.type.Type createBasicType(PrimitiveType type) {
@@ -67,17 +73,28 @@ public class ParquetSchemas {
         }
     }
 
-    private static com.sdu.data.type.Type createComplexType(GroupType type) {
-        GroupType childrenType = type.getType(0).asGroupType();
-        boolean nullable = childrenType.isRepetition(Type.Repetition.OPTIONAL);
-        switch (childrenType.getFieldCount()) {
-            case 1: // LIST
-                Type elementType = childrenType.getType(0);
-                return com.sdu.data.type.Types.listType(nullable, createType(elementType));
-            case 2: // MAP
-                Type keyType = childrenType.getType(0);
-                Type valueType = childrenType.getType(1);
-                return com.sdu.data.type.Types.mapType(nullable, createType(keyType), createType(valueType));
+    private static com.sdu.data.type.Type createComplexType(GroupType type, boolean standardSchema) {
+        if (standardSchema) {
+            GroupType childrenType = type.getType(0).asGroupType();
+            boolean nullable = childrenType.isRepetition(Type.Repetition.OPTIONAL);
+            switch (childrenType.getFieldCount()) {
+                case 1: // LIST
+                    Type elementType = childrenType.getType(0);
+                    return com.sdu.data.type.Types.listType(nullable, createType(elementType, true));
+                case 2: // MAP
+                    Type keyType = childrenType.getType(0);
+                    Type valueType = childrenType.getType(1);
+                    return com.sdu.data.type.Types.mapType(nullable, createType(keyType, true), createType(valueType, true));
+                default:
+                    throw new UnsupportedOperationException("unsupported primary parquet type: " + type);
+            }
+        }
+
+        switch (type.getOriginalType()) {
+            case LIST:
+                Type elementType = type.getType(0);
+                return com.sdu.data.type.Types.listType(false, createType(elementType, false));
+            case MAP:
             default:
                 throw new UnsupportedOperationException("unsupported primary parquet type: " + type);
         }
@@ -133,6 +150,7 @@ public class ParquetSchemas {
                 //     <element-repetition> <element-type> element;
                 // }
                 return Types.repeatedGroup()
+                        .as(LogicalTypeAnnotation.listType())
                         .addField(createParquetType(ARRAY_ELEMENT_NAME, listType.getElementType(), false))
                         .named(name);
 
