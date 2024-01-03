@@ -208,7 +208,7 @@ public class ParquetTest {
 
         @Override
         protected WriteSupport<RowData> getWriteSupport(Configuration conf) {
-            return new RowDataWriteSupport(rowType, true);
+            return new RowDataWriteSupport(rowType);
         }
     }
 

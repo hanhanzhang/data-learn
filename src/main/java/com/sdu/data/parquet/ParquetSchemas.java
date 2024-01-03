@@ -26,12 +26,12 @@ public class ParquetSchemas {
 
     private ParquetSchemas() { }
 
-    public static MessageType convertParquetSchema(RowType rowType, boolean standardSchema) {
+    public static MessageType convertParquetSchema(RowType rowType) {
         List<Type> types = new ArrayList<>();
         for (int i = 0; i < rowType.getFieldCount(); ++i) {
             com.sdu.data.type.Type type = rowType.getFieldType(i);
             String fieldName = rowType.getFieldName(i);
-            types.add(createParquetType(fieldName, type, standardSchema));
+            types.add(createParquetType(fieldName, type));
         }
         return new MessageType(ROW_MESSAGE, types);
     }
@@ -43,16 +43,16 @@ public class ParquetSchemas {
         for (int i = 0; i < fieldCount; ++i) {
             Type type = messageType.getType(i);
             fieldNames[i] = type.getName();
-            fieldTypes[i] = createType(type, standardSchema);
+            fieldTypes[i] = createType(type);
         }
         return new RowType(false, fieldNames, fieldTypes);
     }
 
-    private static com.sdu.data.type.Type createType(Type type, boolean standardSchema) {
+    private static com.sdu.data.type.Type createType(Type type) {
         if (type.isPrimitive()) {
             return createBasicType(type.asPrimitiveType());
         }
-        return createComplexType(type.asGroupType(), standardSchema);
+        return createComplexType(type.asGroupType());
     }
 
     private static com.sdu.data.type.Type createBasicType(PrimitiveType type) {
@@ -73,38 +73,27 @@ public class ParquetSchemas {
         }
     }
 
-    private static com.sdu.data.type.Type createComplexType(GroupType type, boolean standardSchema) {
-        if (standardSchema) {
-            GroupType childrenType = type.getType(0).asGroupType();
-            boolean nullable = childrenType.isRepetition(Type.Repetition.OPTIONAL);
-            switch (childrenType.getFieldCount()) {
-                case 1: // LIST
-                    Type elementType = childrenType.getType(0);
-                    return com.sdu.data.type.Types.listType(nullable, createType(elementType, true));
-                case 2: // MAP
-                    Type keyType = childrenType.getType(0);
-                    Type valueType = childrenType.getType(1);
-                    return com.sdu.data.type.Types.mapType(nullable, createType(keyType, true), createType(valueType, true));
-                default:
-                    throw new UnsupportedOperationException("unsupported primary parquet type: " + type);
-            }
-        }
-
-        switch (type.getOriginalType()) {
-            case LIST:
-                Type elementType = type.getType(0);
-                return com.sdu.data.type.Types.listType(false, createType(elementType, false));
-            case MAP:
+    private static com.sdu.data.type.Type createComplexType(GroupType type) {
+        GroupType childrenType = type.getType(0).asGroupType();
+        boolean nullable = childrenType.isRepetition(Type.Repetition.OPTIONAL);
+        switch (childrenType.getFieldCount()) {
+            case 1: // LIST
+                Type elementType = childrenType.getType(0);
+                return com.sdu.data.type.Types.listType(nullable, createType(elementType));
+            case 2: // MAP
+                Type keyType = childrenType.getType(0);
+                Type valueType = childrenType.getType(1);
+                return com.sdu.data.type.Types.mapType(nullable, createType(keyType), createType(valueType));
             default:
                 throw new UnsupportedOperationException("unsupported primary parquet type: " + type);
         }
     }
 
-    private static Type createParquetType(String name, com.sdu.data.type.Type type, boolean standardSchema) {
+    private static Type createParquetType(String name, com.sdu.data.type.Type type) {
         if (type.isPrimary()) {
             return createParquetPrimaryType(name, (BasicType) type);
         }
-        return createParquetGroupType(name, type, standardSchema);
+        return createParquetGroupType(name, type);
     }
 
     private static PrimitiveType createParquetPrimaryType(String name, BasicType type) {
@@ -131,61 +120,41 @@ public class ParquetSchemas {
         }
     }
 
-    private static GroupType createParquetGroupType(String name, com.sdu.data.type.Type type, boolean standardSchema) {
+    private static GroupType createParquetGroupType(String name, com.sdu.data.type.Type type) {
         Type.Repetition repetition = type.isNullable() ? Type.Repetition.OPTIONAL : Type.Repetition.REQUIRED;
         switch (type.type()) {
             case LIST:
                 com.sdu.data.type.ListType listType = (com.sdu.data.type.ListType) type;
-                if (standardSchema) {
-                    // NOTE: 需要标记<name>是否可空, 若不空时是重复元素, repetition只能标记一种状态, 故:
-                    // 1. <list-repetition> 标记是否可空
-                    // 2. repeated group list 标记是重复元素
-                    // <list-repetition> group <name> {
-                    //   repeated group list {
-                    //     <element-repetition> <element-type> element;
-                    //   }
-                    // }
-                    return Types.list(repetition)
-                            .element(createParquetType(ARRAY_ELEMENT_NAME, listType.getElementType(), true))
-                            .named(name);
-                }
-                // NOTE: 这种情况无法标记是否可空(null 和 empty list是两种不同语义)
-                // repeated group <name> {
+                // NOTE: 需要标记<name>是否可空, 若不空时是重复元素, repetition只能标记一种状态, 故:
+                // 1. <list-repetition> 标记是否可空
+                // 2. repeated group list 标记是重复元素
+                // <list-repetition> group <name> {
+                //   repeated group list {
                 //     <element-repetition> <element-type> element;
+                //   }
                 // }
-                return Types.repeatedGroup()
-                        .as(LogicalTypeAnnotation.listType())
-                        .addField(createParquetType(ARRAY_ELEMENT_NAME, listType.getElementType(), false))
+                return Types.list(repetition)
+                        .element(createParquetType(ARRAY_ELEMENT_NAME, listType.getElementType()))
                         .named(name);
 
             case MAP:
                 com.sdu.data.type.MapType mapType = (com.sdu.data.type.MapType) type;
-                if (standardSchema) {
-                    // <map-repetition> group <name> {
-                    //    repeated group key_value {
-                    //       <key-repetition> <key-type> key_name;
-                    //       <value-repetition> <key-type> value_name;
-                    //    }
-                    // }
-                    return Types.map(repetition)
-                            .key(createParquetType(MAP_KEY_NAME, mapType.getKeyType(), true))
-                            .value(createParquetType(MAP_VALUE_NAME, mapType.getValueType(), true))
-                            .named(name);
-                }
-                // repeated group <name> {
-                //    <key-repetition> <key-type> key_name;
-                //    <value-repetition> <key-type> value_name;
+                // <map-repetition> group <name> {
+                //    repeated group key_value {
+                //       <key-repetition> <key-type> key_name;
+                //       <value-repetition> <key-type> value_name;
+                //    }
                 // }
-                return Types.repeatedGroup()
-                        .addField(createParquetType(MAP_KEY_NAME, mapType.getKeyType(), false))
-                        .addField(createParquetType(MAP_VALUE_NAME, mapType.getValueType(), false))
+                return Types.map(repetition)
+                        .key(createParquetType(MAP_KEY_NAME, mapType.getKeyType()))
+                        .value(createParquetType(MAP_VALUE_NAME, mapType.getValueType()))
                         .named(name);
 
             case ROW:
                 com.sdu.data.type.RowType rowType = (com.sdu.data.type.RowType) type;
                 Types.GroupBuilder<GroupType> builder = Types.buildGroup(repetition);
                 for (int i = 0; i < rowType.getFieldCount(); ++i) {
-                    builder.addField(createParquetType(rowType.getFieldName(i), rowType.getFieldType(i), standardSchema));
+                    builder.addField(createParquetType(rowType.getFieldName(i), rowType.getFieldType(i)));
                 }
                 return builder.named(name);
             default:

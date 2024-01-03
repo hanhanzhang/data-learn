@@ -1,26 +1,25 @@
 package com.sdu.data.parquet.writer;
 
-import com.sdu.data.parquet.ParquetSchemas;
-import com.sdu.data.parquet.RowData;
-import com.sdu.data.type.RowType;
+import java.util.HashMap;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.hadoop.api.WriteSupport;
 import org.apache.parquet.io.api.RecordConsumer;
 import org.apache.parquet.schema.MessageType;
 
-import java.util.HashMap;
+import com.sdu.data.parquet.ParquetSchemas;
+import com.sdu.data.parquet.RowData;
+import com.sdu.data.type.RowType;
 
 public class RowDataWriteSupport extends WriteSupport<RowData> {
 
     private final RowType rowType;
     private final MessageType schema;
-    private final boolean standardSchema;
     private RowDataParquetWriter writer;
 
-    public RowDataWriteSupport(RowType rowType, boolean standardSchema) {
+    public RowDataWriteSupport(RowType rowType) {
         this.rowType = rowType;
-        this.standardSchema = standardSchema;
-        this.schema = ParquetSchemas.convertParquetSchema(rowType, standardSchema);
+        this.schema = ParquetSchemas.convertParquetSchema(rowType);
     }
 
     @Override
@@ -30,7 +29,7 @@ public class RowDataWriteSupport extends WriteSupport<RowData> {
 
     @Override
     public void prepareForWrite(RecordConsumer recordConsumer) {
-        this.writer = new RowDataParquetWriter(standardSchema, recordConsumer, rowType);
+        this.writer = new RowDataParquetWriter(recordConsumer, rowType);
     }
 
     @Override
