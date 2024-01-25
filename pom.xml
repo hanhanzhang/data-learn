@@ -49,6 +49,19 @@
             <version>3.4.4</version>
         </dependency>
 
+        <!-- 内存对象 -->
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <version>0.17</version>
+        </dependency>
+        <!-- 系统参数 -->
+        <dependency>
+            <groupId>com.github.oshi</groupId>
+            <artifactId>oshi-core</artifactId>
+            <version>6.4.11</version>
+        </dependency>
+
         <!-- log4j -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
