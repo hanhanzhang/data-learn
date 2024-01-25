@@ -37,7 +37,10 @@ public class ObjectMemoryOccupyBootstrap {
 
     public static void main(String[] args) {
         Student student = new Student("jame", 28, new Teacher("wade", 18349232349L), new Teacher("lily", 13458739876L));
-        System.out.println(ClassLayout.parseInstance(student).toPrintable());
+        ClassLayout classLayout = ClassLayout.parseInstance(student);
+        System.out.println("instance size: " + classLayout.instanceSize());
+        classLayout.fields().forEach(f -> System.out.printf("field name: %s, size: %d\n", f.name(), f.size()));
+        System.out.println(classLayout.toPrintable());
     }
 
 }

@@ -10,6 +10,9 @@ public class ClassSize {
     //
     // 对齐填充: Java对象大小默认按8字节对齐,也就是说对象大小必须是8字节的倍数, 若是不够8字节的话那么就会进行对齐填充
 
+
+    private static final String VM_CLASSNAME = "";
+
     private ClassSize() {
 
     }
@@ -54,5 +57,6 @@ public class ClassSize {
         String model = System.getProperty("sun.arch.data.model");
         return model != null && model.equals("32");
     }
+
 
 }
