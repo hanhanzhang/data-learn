@@ -1,11 +1,14 @@
 package com.sdu.data.hbase.threads;
 
-import static java.lang.String.format;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.errorprone.annotations.RestrictedApi;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+
+import static java.lang.String.format;
 
 public class ChoreServices {
 
@@ -15,12 +18,13 @@ public class ChoreServices {
     // 若定时任务未能在调度周期被调度, 则需扩容调度线程数, 此变量记录为ScheduledChore扩容核心线程是否成功
     private final HashMap<ScheduleChore, Boolean> choresMissingStartTime;
 
-    public ChoreServices(final String coreThreadPoolPrefix, int corePoolSize, boolean removedOnCancelTask) {
-        scheduler = new ScheduledThreadPoolExecutor(corePoolSize, new ChoreServiceThreadFactory(coreThreadPoolPrefix));
-        // removedOnCancelTask = true: 调度任务取消时则将调度任务从任务队列中剔除, 防止再次被调度
-        scheduler.setRemoveOnCancelPolicy(removedOnCancelTask);
-        scheduledChores = new HashMap<>();
-        choresMissingStartTime = new HashMap<>();
+    public ChoreServices(final String coreThreadPoolPrefix, int corePoolSize) {
+        this.scheduler = new ScheduledThreadPoolExecutor(corePoolSize, new ChoreServiceThreadFactory(coreThreadPoolPrefix));
+        // removedOnCancelTask = true: 调度任务取消时则将调度任务从任务队列中剔除
+        // removedOnCancelTask = false: 调度任务取消时则不会将调度任务从任务队列中剔除(也不会再次被调度, 任务状态已经中断), 容易造成内存泄露
+        this.scheduler.setRemoveOnCancelPolicy(true);
+        this.scheduledChores = new HashMap<>();
+        this.choresMissingStartTime = new HashMap<>();
     }
 
     // 可被任意线程添加任务
@@ -67,20 +71,35 @@ public class ChoreServices {
         rescheduleChore(chore);
     }
 
-    public synchronized void cancelChore(ScheduleChore chore) {
+    @RestrictedApi(explanation = "Should only be called in ScheduleChore", link = "",
+            allowedOnPath = ".*/com/sdu/data/hbase/threads/(ScheduleChore|ChoreServices).java")
+    synchronized void cancelChore(ScheduleChore chore) {
         cancelChore(chore, true);
     }
 
-    public synchronized void cancelChore(ScheduleChore chore, boolean mayInterruptIfRunning) {
+    @RestrictedApi(explanation = "Should only be called in ScheduleChore", link = "",
+            allowedOnPath = ".*/com/sdu/data/hbase/threads/(ScheduleChore|ChoreServices).java")
+    synchronized void cancelChore(ScheduleChore chore, boolean mayInterruptIfRunning) {
         if (chore == null || !scheduledChores.containsKey(chore)) {
             return;
         }
         ScheduledFuture<?> scheduledFuture = scheduledChores.remove(chore);
-        scheduledFuture.cancel(mayInterruptIfRunning);
+        // 注意:
+        // 1. Java线程中断是一种协作机制, 也就是说调用线程对象interrupt方法不一定中断正在运行的任务, 它会合适的时机中断自己
+        // 2. 每个线程都一个boolean属性标记是否被中断, Thread.interrupt()仅仅是将该属性设置为true
+        // 3. 如果任务需要感应线程中断状态, 则需要通过Thread.isInterrupted()判断再做处理
+        boolean suc = scheduledFuture.cancel(mayInterruptIfRunning);
+        String msg = format("Chore(%s) cancelled %s", chore.getName(), suc ? "success" : "failure");
+        System.out.println(msg);
         if (choresMissingStartTime.containsKey(chore)) {
             choresMissingStartTime.remove(chore);
             requestCorePoolDecrease();
         }
+    }
+
+    @VisibleForTesting
+    public synchronized void cancelChoreForTest(ScheduleChore chore, boolean mayInterruptIfRunning) {
+        cancelChore(chore, mayInterruptIfRunning);
     }
 
     private void rescheduleChore(ScheduleChore chore) {

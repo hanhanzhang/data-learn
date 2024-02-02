@@ -1,9 +1,9 @@
 package com.sdu.data.hbase.threads;
 
 
-import static java.lang.String.format;
-
 import java.util.concurrent.TimeUnit;
+
+import static java.lang.String.format;
 
 public abstract class ScheduleChore implements Runnable {
 
@@ -61,7 +61,7 @@ public abstract class ScheduleChore implements Runnable {
     @Override
     public void run() {
         updateTimeTrackingBeforeRun();
-        String msg = format("scheduler thread(%s) schedule chore %s on %d", Thread.currentThread().getName(), getName(), timeOfThisRun);
+        String msg = format("Thread(%s) start schedule chore(%s) at %d", Thread.currentThread().getName(), getName(), timeOfThisRun);
         System.out.println(msg);
         if (missedStartTime() && isScheduling()) {
             // 核心线程不足够并发执行, 动态扩容核心线程数
@@ -72,13 +72,15 @@ public abstract class ScheduleChore implements Runnable {
             try {
                 chore();
             } catch (Throwable e) {
-                String error = format("failed schedule chore(%s), error message: %s", getName(), e.getMessage());
+                String error = format("Failed schedule chore(%s), error message: %s", getName(), e.getMessage());
                 System.out.println(error);
                 if (this.stoppable.isStopped()) {
                     cancel(false);
                 }
             }
         }
+        msg = format("Thread(%s) finished schedule chore(%s) at %d", Thread.currentThread().getName(), getName(), timeOfThisRun);
+        System.out.println(msg);
     }
 
     public abstract void chore();
