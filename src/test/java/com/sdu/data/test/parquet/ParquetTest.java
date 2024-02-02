@@ -1,4 +1,4 @@
-package com.sdu.data.parquert.test;
+package com.sdu.data.test.parquet;
 
 import static com.sdu.data.type.Types.doubleType;
 import static com.sdu.data.type.Types.intType;
