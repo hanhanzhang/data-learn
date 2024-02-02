@@ -21,9 +21,9 @@ public abstract class ScheduleChore implements Runnable {
 
     private ChoreServices choreServices;
 
-    // 最近执行时间(需保证线程安全, 这有可能上次调度未执行结束, 新一轮调度开始, 两次调度执行在不同线程中)
+    // 最近执行时间
     private long timeOfLastRun = -1;
-    // 本次执行时间(需保证线程安全, 这有可能上次调度未执行结束, 新一轮调度开始, 两次调度执行在不同线程中)
+    // 本次执行时间
     private long timeOfThisRun = -1;
 
     public ScheduleChore(String name, int period, TimeUnit timeUnit, long initialDelay, Stoppable stoppable) {
@@ -79,8 +79,6 @@ public abstract class ScheduleChore implements Runnable {
                 }
             }
         }
-        msg = format("Thread(%s) finished schedule chore(%s) at %d", Thread.currentThread().getName(), getName(), timeOfThisRun);
-        System.out.println(msg);
     }
 
     public abstract void chore();
