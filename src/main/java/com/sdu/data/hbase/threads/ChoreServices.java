@@ -20,8 +20,11 @@ public class ChoreServices {
 
     public ChoreServices(final String coreThreadPoolPrefix, int corePoolSize) {
         this.scheduler = new ScheduledThreadPoolExecutor(corePoolSize, new ChoreServiceThreadFactory(coreThreadPoolPrefix));
-        // removedOnCancelTask = true: 调度任务取消时则将调度任务从任务队列中剔除
-        // removedOnCancelTask = false: 调度任务取消时则不会将调度任务从任务队列中剔除(也不会再次被调度, 任务状态已经中断), 容易造成内存泄露
+        // 若removedOnCancelTask = true时:
+        // 1. Future.cancel则会立即将任务从任务队列中剔除, 这只是针对未被调度执行的任务, 若已调度执行的任务已经不在任务队列了
+        // 2. Future.cancel()将任务状态标记为INTERRUPTED, 任务不会再次被放入任务队列
+        // NOTE:
+        // 具体可查看ScheduledFutureTask.cancel()方法
         this.scheduler.setRemoveOnCancelPolicy(true);
         this.scheduledChores = new HashMap<>();
         this.choresMissingStartTime = new HashMap<>();
@@ -54,7 +57,6 @@ public class ChoreServices {
         }
     }
 
-    // 同一个定时任务可能同时被不同被定时线程池中不同线程访问
     public synchronized boolean isChoreScheduled(ScheduleChore chore) {
         return chore != null && scheduledChores.containsKey(chore) && !scheduledChores.get(chore).isDone();
     }
@@ -84,10 +86,10 @@ public class ChoreServices {
             return;
         }
         ScheduledFuture<?> scheduledFuture = scheduledChores.remove(chore);
-        // 注意:
-        // 1. Java线程中断是一种协作机制, 也就是说调用线程对象interrupt方法不一定中断正在运行的任务, 它会合适的时机中断自己
-        // 2. 每个线程都一个boolean属性标记是否被中断, Thread.interrupt()仅仅是将该属性设置为true
-        // 3. 如果任务需要感应线程中断状态, 则需要通过Thread.isInterrupted()判断再做处理
+        // Java线程中断是一种协作机制, 调用Future.interrupt()不一定中断正在运行的任务, 只是将线程标记为interrupted
+        // NOTE:
+        // 1. 线程池提交的任务被封装成ScheduledFutureTask, Future.cancel() -> ScheduledFutureTask.cancel() -> Thread.interrupt()
+        // 2. 如果任务需感知线程被中断状态, 则需通过Thread.isInterrupted()判断再做任务逻辑处理
         boolean suc = scheduledFuture.cancel(mayInterruptIfRunning);
         String msg = format("Chore(%s) cancelled %s", chore.getName(), suc ? "success" : "failure");
         System.out.println(msg);

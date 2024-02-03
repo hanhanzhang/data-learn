@@ -7,7 +7,11 @@ import static java.lang.String.format;
 
 public abstract class ScheduleChore implements Runnable {
 
-    // 定时线程池队列中定时任务是复用, 故可能上一周定时调度未完成, 又开启新一轮任务调度, 这两轮调度在不同调度线程中, 故需保证线程安全
+    // ScheduledThreadPoolExecutor线程池周期性调度任务时, 当执行完调度周期内任务时, 根据任务状态判断是否将任务重新放回调度队列, 这说明:
+    // 1. Future.cancel()取消任务, 任务状态被标记为INTERRUPTED, 任务不会再次被放入任务队列
+    // 2. Runnable对象被重复使用, 但只会ScheduledThreadPoolExecutor线程池中单个线程访问
+    // NOTE:
+    // 相关事项可具体查看ScheduledFutureTask.run()方法
 
     private final String name;
     // 调度周期
