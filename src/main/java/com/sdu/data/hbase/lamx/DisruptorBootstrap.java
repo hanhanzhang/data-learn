@@ -3,6 +3,8 @@ package com.sdu.data.hbase.lamx;
 import static com.sdu.data.hbase.lamx.Event.EventType.Start;
 import static com.sdu.data.hbase.lamx.Event.EventType.Stop;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hbase.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
@@ -65,6 +67,11 @@ public class DisruptorBootstrap {
     private static class PrintEventHandler implements EventHandler<EventChunk> {
 
         private long consumerSequence = -1L;
+        private final long blockIntervalSeconds;
+
+        public PrintEventHandler(long blockIntervalSeconds) {
+            this.blockIntervalSeconds = blockIntervalSeconds;
+        }
 
         @Override
         public void onEvent(EventChunk event, long sequence, boolean endOfBatch) throws Exception {
@@ -74,6 +81,9 @@ public class DisruptorBootstrap {
             // 顺序消费
             if (consumerSequence != e.sequenceId()) {
                 throw new RuntimeException("failed consume sequence");
+            }
+            if (blockIntervalSeconds > 0) {
+                TimeUnit.SECONDS.sleep(blockIntervalSeconds);
             }
         }
     }
@@ -101,7 +111,7 @@ public class DisruptorBootstrap {
 
 
     public static void main(String[] args) throws Exception {
-        DisruptorBootstrap disruptorBootstrap = new DisruptorBootstrap(EventChunk::new, new PrintEventHandler());
+        DisruptorBootstrap disruptorBootstrap = new DisruptorBootstrap(EventChunk::new, new PrintEventHandler(2));
 
         // 两个生产者
         EventProducer startProducer = new EventProducer(2048, disruptorBootstrap, Start);
