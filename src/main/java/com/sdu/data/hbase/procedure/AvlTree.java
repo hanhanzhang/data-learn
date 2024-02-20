@@ -57,6 +57,11 @@ public class AvlTree {
         if (balanceFactor == 2) {
             // 若新节点被插到根节点左孩子的右子树, 则需要双旋转(LR)
             if (balanceFactor(root.left) < 0) {
+                // root.left子树插入新节点后高度必须+1才有可能使得balanceFactor=2
+                // root.left子树平衡因子在新节点插入前, 有三种情况:
+                //  1: 若插root.left右子树节点, root节点高度不变, 不符合, 故只能插入到root.left左子树, 为LL
+                //  0: 新节点可插到root.left左右子节点, 故balanceFactor(root.left) < 0表明插到root.left右子树
+                // -1: 若插root.left左子树节点, root节点高度不变, 不符合, 故只能插入到root.left右子树(balanceFactor(root.left) = -2), 为LR
                 root.left = leftRotate(root.left);
             }
             return rightRotate(root);
