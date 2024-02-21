@@ -15,7 +15,7 @@ public class AvlTree {
         }
         int cmp = root.value.compareTo(value);
         if (cmp == 0) {
-            System.out.println("node already exist and ignore insert, value: " + value);
+            System.out.println("node already insert, value: " + value);
             return root;
         }
         // cmp < 0: root.value < value
