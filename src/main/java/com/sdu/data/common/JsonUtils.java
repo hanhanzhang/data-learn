@@ -1,19 +1,24 @@
 package com.sdu.data.common;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import org.apache.hadoop.hbase.client.RegionInfo;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.sdu.data.hbase.RegionInfoSerializer;
 
 public class JsonUtils {
 
-    private static final Gson GSON;
+    private static final ObjectMapper MAPPER;
 
     static {
-        GsonBuilder builder = new GsonBuilder();
-        GSON = builder.create();
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(RegionInfo.class, RegionInfoSerializer.INSTANCE);
+        MAPPER = new ObjectMapper();
+        MAPPER.registerModule(module);
     }
 
-    public static String toJson(Object obj) {
-        return GSON.toJson(obj);
+    public static String toJson(Object obj) throws Exception {
+        return MAPPER.writeValueAsString(obj);
     }
 
 }

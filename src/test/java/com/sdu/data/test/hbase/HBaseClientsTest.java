@@ -1,7 +1,7 @@
 package com.sdu.data.test.hbase;
 
 import static com.sdu.data.common.JsonUtils.toJson;
-import static com.sdu.data.hbase.ColumnConverter.SIMPLE_COLUMN_CONVERTER;
+import static com.sdu.data.hbase.HBaseRowDataConverter.SIMPLE_COLUMN_CONVERTER;
 import static java.lang.String.format;
 import static org.apache.hadoop.hbase.HConstants.REGIONINFO_QUALIFIER_STR;
 import static org.apache.hadoop.hbase.HConstants.SEQNUM_QUALIFIER_STR;
@@ -14,18 +14,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.client.RegionInfo;
 import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
+import org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Assert;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
-import com.sdu.data.hbase.ColumnConverter;
 import com.sdu.data.hbase.HBaseClients;
 import com.sdu.data.hbase.HBaseRowData;
+import com.sdu.data.hbase.HBaseRowDataConverter;
 
 public class HBaseClientsTest {
 
@@ -69,7 +71,7 @@ public class HBaseClientsTest {
     @Test
     public void testGetMetaTable() {
         // hbase:meta:table:state
-        ColumnConverter<HBaseRowData<String, String, String, String>> tableConverter =
+        HBaseRowDataConverter<HBaseRowData<String, String, String, String>> tableConverter =
                 (rowKey, family, qualifier, value) -> HBaseRowData.of(
                         Bytes.toString(rowKey),
                         Bytes.toString(family),
@@ -85,10 +87,10 @@ public class HBaseClientsTest {
         printSeparator();
 
         // hbase:meta:info
-        ColumnConverter<HBaseRowData<String, String, String, String>> infoConverter =
+        HBaseRowDataConverter<HBaseRowData<String, String, String, String>> infoConverter =
                 (rowKey, family, qualifier, value) -> {
                     String columnQualifier = Bytes.toString(qualifier);
-                    String formatValue = "";
+                    String formatValue;
                     switch (columnQualifier) {
                         case REGIONINFO_QUALIFIER_STR: // hbase:meta:info:regioninfo
                             RegionInfo regionInfo = RegionInfo.parseFrom(value);
@@ -141,11 +143,24 @@ public class HBaseClientsTest {
 
     @Test
     public void testGetNamespaceTable() {
+        // hbase:namespace:info
+        HBaseRowDataConverter<HBaseRowData<String, String, String, String>> infoConverter =
+                (rowKey, family, qualifier, value) -> {
+                    NamespaceDescriptor descriptor = ProtobufUtil.toNamespaceDescriptor(
+                            org.apache.hadoop.hbase.shaded.protobuf.generated.HBaseProtos.NamespaceDescriptor.parseFrom(value)
+                    );
+                    return HBaseRowData.of(
+                            Bytes.toString(rowKey),
+                            Bytes.toString(family),
+                            Bytes.toString(qualifier),
+                            toJson(descriptor)
+                    );
+                };
         List<HBaseRowData<String, String, String, String>> namespaceInfoValues =
                 HBaseClients.scan(
                         NAMESPACE_TABLE_NAME,
                         NAMESPACE_COLUMN_FAMILY_INFO,
-                        SIMPLE_COLUMN_CONVERTER);
+                        infoConverter);
         printTableRowData(namespaceInfoValues);
     }
 

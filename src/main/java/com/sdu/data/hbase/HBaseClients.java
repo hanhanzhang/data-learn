@@ -1,9 +1,7 @@
 package com.sdu.data.hbase;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -115,18 +113,22 @@ public class HBaseClients {
         }
     }
 
-    public static void put(String tableName, String key, Tuple3<String, String, byte[]> ... columns) {
+    public static void put(String tableName, HBaseRowData<String, String, String, byte[]> rowData) {
         try (Table table = connection.getTable(TableName.valueOf(tableName))) {
-            Put put = new Put(Bytes.toBytes(key));
+            Put put = new Put(Bytes.toBytes(rowData.getKey()));
+            put.addColumn(
+                    Bytes.toBytes(rowData.getFamily()),
+                    Bytes.toBytes(rowData.getQualifier()),
+                    rowData.getValue()
+            );
             // column family, column name, column value
-            Arrays.stream(columns).forEach(tuple -> put.addColumn(Bytes.toBytes(tuple.getT1()), Bytes.toBytes(tuple.getT2()), tuple.getT3()));
             table.put(put);
         } catch (IOException e) {
             throw new RuntimeException("failed put data to hbase table, name: " + tableName, e);
         }
     }
 
-    public static <RESULT> List<RESULT> scan(String tableName, String columnFamily, ColumnConverter<RESULT> columnConverter) {
+    public static <RESULT> List<RESULT> scan(String tableName, String columnFamily, HBaseRowDataConverter<RESULT> rowConverter) {
         try {
             if (tableName == null || tableName.isEmpty()) {
                 return Collections.emptyList();
@@ -143,14 +145,12 @@ public class HBaseClients {
 
             try (ResultScanner rs = table.getScanner(family)) {
                 List<RESULT> values = new LinkedList<>();
-                Iterator<Result> it = rs.iterator();
-                while (it.hasNext()) {
-                    Result result = it.next();
+                for (Result result : rs) {
                     byte[] rowKey = result.getRow();
                     // 列族的所有的列限定符
                     Map<byte[], byte[]> qualifiers = result.getFamilyMap(family);
                     for (Map.Entry<byte[], byte[]> qualifierEntry : qualifiers.entrySet()) {
-                        values.add(columnConverter.convert(rowKey, family, qualifierEntry.getKey(), qualifierEntry.getValue()));
+                        values.add(rowConverter.convert(rowKey, family, qualifierEntry.getKey(), qualifierEntry.getValue()));
                     }
                 }
                 return values;
