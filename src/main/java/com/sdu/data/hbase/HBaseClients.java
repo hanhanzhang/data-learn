@@ -1,10 +1,13 @@
 package com.sdu.data.hbase;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -113,29 +116,29 @@ public class HBaseClients {
         }
     }
 
-    public static void put(String tableName, HBaseRowData<String, String, String, byte[]> rowData) {
-        try (Table table = connection.getTable(TableName.valueOf(tableName))) {
-            Put put = new Put(Bytes.toBytes(rowData.getKey()));
-            put.addColumn(
-                    Bytes.toBytes(rowData.getFamily()),
-                    Bytes.toBytes(rowData.getQualifier()),
-                    rowData.getValue()
-            );
+    public static void put(HPutParam putParam) {
+        try (Table table = connection.getTable(TableName.valueOf(putParam.getTableName()))) {
+            final Put put = new Put(Bytes.toBytes(putParam.getRowKey()));
+            for (HPutParam.PutColumnParam columnParam : putParam.getColumnPutParams()) {
+                for (Map.Entry<String, byte[]> qualifierEntry : columnParam.getQualifierValues().entrySet()) {
+                    put.addColumn(
+                            Bytes.toBytes(columnParam.getFamily()),
+                            Bytes.toBytes(qualifierEntry.getKey()),
+                            qualifierEntry.getValue()
+                    );
+                }
+            }
             // column family, column name, column value
             table.put(put);
         } catch (IOException e) {
-            throw new RuntimeException("failed put data to hbase table, name: " + tableName, e);
+            throw new RuntimeException("failed put data to hbase table, name: " + putParam.getTableName(), e);
         }
     }
 
     public static <RESULT> List<RESULT> scan(String tableName, String columnFamily, HBaseRowDataConverter<RESULT> rowConverter) {
         try {
-            if (tableName == null || tableName.isEmpty()) {
-                return Collections.emptyList();
-            }
-            if (columnFamily == null || columnFamily.isEmpty()) {
-                return Collections.emptyList();
-            }
+            checkArgument(tableName != null && !tableName.isEmpty());
+            checkArgument(columnFamily != null && !columnFamily.isEmpty());
             Optional<Table> tableOpt = getTable(tableName);
             Table table = tableOpt.orElse(null);
             if (table == null) {
@@ -160,14 +163,35 @@ public class HBaseClients {
         }
     }
 
-    public static Result get(String tableName, String key) {
+    public static <RESULT> List<RESULT> get(String tableName, String key, HBaseRowDataConverter<RESULT> rowConverter) {
         try (Table table = connection.getTable(TableName.valueOf(tableName))) {
             Get get = new Get(Bytes.toBytes(key));
-            return table.get(get);
-        } catch (IOException e) {
+            Result result = table.get(get);
+            byte[] rowKey = result.getRow();
+            List<RESULT> values = new LinkedList<>();
+            // 列族的所有的列限定符
+            NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> familyMap = result.getMap();
+            for (Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> family : familyMap.entrySet()) {
+                byte[] familyBytes = family.getKey();
+                for (Map.Entry<byte[], NavigableMap<Long, byte[]>> qualifier : family.getValue().entrySet()) {
+                    byte[] qualifierBytes = qualifier.getKey();
+                    NavigableMap<Long, byte[]> versionValues = qualifier.getValue();
+                    values.add(
+                            rowConverter.convert(
+                                    rowKey,
+                                    familyBytes,
+                                    qualifierBytes,
+                                    versionValues.get(qualifier.getValue().firstKey()) // 取最新版本
+                            )
+                    );
+                }
+            }
+            return values;
+        } catch (Exception e) {
             throw new RuntimeException("failed get data from hbase, name: " + tableName + " and key: " + key, e);
         }
     }
+
 
     private static boolean checkNamespaceIfExist(TableName tableName) {
         try {

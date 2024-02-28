@@ -28,6 +28,7 @@ import com.google.common.collect.Lists;
 import com.sdu.data.hbase.HBaseClients;
 import com.sdu.data.hbase.HBaseRowData;
 import com.sdu.data.hbase.HBaseRowDataConverter;
+import com.sdu.data.hbase.HPutParam;
 
 public class HBaseClientsTest {
 
@@ -50,7 +51,10 @@ public class HBaseClientsTest {
     private static final String VIDEO_LIVE_TABLE_QUALIFIER = "live";
     private static final String VIDEO_VOD_TABLE_NAME = format("%s:%s", VIDEO_NAMESPACE, VIDEO_VOD_TABLE_QUALIFIER);
     private static final String VIDEO_LIVE_TABLE_NAME = format("%s:%s", VIDEO_NAMESPACE, VIDEO_LIVE_TABLE_QUALIFIER);
-    private static final List<String> VIDEO_COLUMN_FAMILIES = Lists.newArrayList("product", "transcode", "play");
+    private static final String VIDEO_COLUMN_FAMILY_PRODUCT = "product";
+    private static final String VIDEO_COLUMN_FAMILY_TRANSCODE = "transcode";
+    private static final String VIDEO_COLUMN_FAMILY_PLAY = "play";
+    private static final List<String> VIDEO_COLUMN_FAMILIES = Lists.newArrayList(VIDEO_COLUMN_FAMILY_PRODUCT, VIDEO_COLUMN_FAMILY_TRANSCODE, VIDEO_COLUMN_FAMILY_PLAY);
 
     @Test
     public void testCreateTable() {
@@ -163,6 +167,27 @@ public class HBaseClientsTest {
                         infoConverter);
         printTableRowData(namespaceInfoValues);
     }
+
+    @Test
+    public void testTablePutAndGet() {
+        HPutParam.PutColumnParam putColumnParam =  HPutParam.PutColumnParam.builder()
+                .setFamily(VIDEO_COLUMN_FAMILY_PRODUCT)
+                .addQualifier("id", Bytes.toBytes("10000"))
+                .addQualifier("author", Bytes.toBytes("james"))
+                .build();
+        HPutParam putParam = HPutParam.builder()
+                .setTableName(VIDEO_VOD_TABLE_NAME)
+                .setRowKey("vod_10000")
+                .addPutColumnParam(putColumnParam)
+                .build();
+        HBaseClients.put(putParam);
+
+        List<HBaseRowData<String, String, String, String>> rows =
+                HBaseClients.get(VIDEO_VOD_TABLE_NAME, "vod_10000", SIMPLE_COLUMN_CONVERTER);
+        Assert.assertFalse(rows.isEmpty());
+        printTableRowData(rows);
+    }
+
 
     private static void printTableDescriptorDetail(TableDescriptor descriptor) {
         for (ColumnFamilyDescriptor columnFamilyDescriptor : descriptor.getColumnFamilies()) {
