@@ -80,6 +80,12 @@ public class HPutParam {
             }
 
             public PutColumnParam build() {
+                if (family == null) {
+                    throw new NullPointerException("family empty");
+                }
+                if (qualifierValues == null) {
+                    throw new NullPointerException("qualifiers empty");
+                }
                 return new PutColumnParam(family, qualifierValues);
             }
         }
@@ -113,6 +119,15 @@ public class HPutParam {
         }
 
         public HPutParam build() {
+            if (tableName == null) {
+                throw new NullPointerException("table name empty");
+            }
+            if (rowKey == null) {
+                throw new NullPointerException("row key empty");
+            }
+            if (columnPutParams == null) {
+                throw new NullPointerException("column families empty");
+            }
             return new HPutParam(tableName, rowKey, columnPutParams);
         }
     }

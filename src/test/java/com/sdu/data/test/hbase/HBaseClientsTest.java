@@ -170,15 +170,25 @@ public class HBaseClientsTest {
 
     @Test
     public void testTablePutAndGet() {
-        HPutParam.PutColumnParam putColumnParam =  HPutParam.PutColumnParam.builder()
+        // video:vod:product
+        HPutParam.PutColumnParam productPutColumnParam =  HPutParam.PutColumnParam.builder()
                 .setFamily(VIDEO_COLUMN_FAMILY_PRODUCT)
-                .addQualifier("id", Bytes.toBytes("10000"))
+                .addQualifier("id", Bytes.toBytes("10001"))
                 .addQualifier("author", Bytes.toBytes("james"))
                 .build();
+        // video:vod:transcode
+        HPutParam.PutColumnParam transcodePutColumnParam =  HPutParam.PutColumnParam.builder()
+                .setFamily(VIDEO_COLUMN_FAMILY_TRANSCODE)
+                .addQualifier("chip", Bytes.toBytes("sl200"))
+                .addQualifier("algo", Bytes.toBytes("H265"))
+                .build();
+
+
         HPutParam putParam = HPutParam.builder()
                 .setTableName(VIDEO_VOD_TABLE_NAME)
                 .setRowKey("vod_10000")
-                .addPutColumnParam(putColumnParam)
+                .addPutColumnParam(productPutColumnParam)
+                .addPutColumnParam(transcodePutColumnParam)
                 .build();
         HBaseClients.put(putParam);
 
