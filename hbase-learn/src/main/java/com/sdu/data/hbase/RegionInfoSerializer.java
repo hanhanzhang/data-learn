@@ -8,12 +8,9 @@ import org.apache.hadoop.hbase.util.Bytes;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
+import com.sdu.data.common.SerializerInfo;
 
-public class RegionInfoSerializer extends JsonSerializer<RegionInfo> {
-
-    public static final RegionInfoSerializer INSTANCE = new RegionInfoSerializer();
-
-    private RegionInfoSerializer() { }
+public class RegionInfoSerializer extends JsonSerializer<RegionInfo> implements SerializerInfo<RegionInfo> {
 
     @Override
     public void serialize(RegionInfo value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
@@ -41,5 +38,10 @@ public class RegionInfoSerializer extends JsonSerializer<RegionInfo> {
 
         gen.writeEndObject();
 
+    }
+
+    @Override
+    public Class<RegionInfo> serializerClass() {
+        return RegionInfo.class;
     }
 }
