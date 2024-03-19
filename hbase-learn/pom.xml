@@ -17,6 +17,12 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.sdu.data</groupId>
+            <artifactId>data-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- hbase -->
         <dependency>
             <groupId>org.apache.hbase</groupId>
