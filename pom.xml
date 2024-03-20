@@ -13,6 +13,7 @@
         <module>hbase-learn</module>
         <module>parquet-learn</module>
         <module>data-common</module>
+        <module>hadoop-learn</module>
     </modules>
 
     <dependencies>
