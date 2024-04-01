@@ -4,12 +4,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.Flushable;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.Hashtable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,8 +32,31 @@ public class Client implements AutoCloseable {
         // STEP1: Connection是否连接, 若未连接则发起连接
         Connection connection = getConnection(rpcKind, remoteId, call);
         // STEP2: 向服务端发送请求
+        connection.sendRpcCall(call);
+        return getRpcResponse(call, -1, null);
+    }
 
-        return null;
+    private Writeable getRpcResponse(final Call call, final long timeout, final TimeUnit unit) throws IOException {
+        // 同步阻塞
+        synchronized (call) {
+            while (!call.done) {
+                try {
+                    call.wait(unit.toMillis(timeout));
+                    if (!call.done) {
+                        return null;
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new InterruptedIOException("Call interrupted");
+                }
+            }
+            if (call.error != null) {
+                throw new IOException("call exception", call.error);
+            } else {
+                return call.rpcResponse;
+            }
+        }
+
     }
 
     private Connection getConnection(RPC.RpcKind rpcKind, ConnectionId remoteId, Call call) throws IOException {
@@ -85,18 +110,20 @@ public class Client implements AutoCloseable {
     // RPC调用线程向其添加RPC请求
     private class Connection extends Thread {
 
-        private final AtomicBoolean shouldCloseConnection = new AtomicBoolean(false);
         // 连接线程
         private final AtomicReference<Thread> connectionThread = new AtomicReference<>();
         // Hashtable线程安全
         private final Hashtable<Integer, Call> calls = new Hashtable<>();
         // 连接信息
+        private final int maxResponseLength;
         private Socket socket;
         private IpcStreams ipcStreams;
+        private final AtomicBoolean shouldCloseConnection = new AtomicBoolean(false);
+        private IOException closeException;
 
 
         Connection(ConnectionId connectionId) {
-
+            this.maxResponseLength = connectionId.getMaxResponseLength();
         }
 
         private synchronized boolean addCall(Call call) {
@@ -109,8 +136,41 @@ public class Client implements AutoCloseable {
             return true;
         }
 
-        // RPC调用线程发起服务器连接(避免重复连接)
+        // RPC调用线程发起服务器连接(避免重复连接且需要串行访问)
         private synchronized void setupIOStreams() {
+            if (socket != null || shouldCloseConnection.get()) {
+                return;
+            }
+            try {
+                connectionThread.set(Thread.currentThread());
+                while (true) {
+                    // STEP1: 连接服务端
+                    setupConnection();
+                    ipcStreams = new IpcStreams(socket, maxResponseLength);
+                    // STEP2: 向服务端发送连接头信息
+                    writeConnectionHeader(ipcStreams);
+                    // STEP3: 启动Connection线程, 持续接受来自服务端的响应
+                    this.start();
+                    return;
+                }
+            } catch (Throwable t) {
+                // execute close operation
+
+            } finally {
+                connectionThread.set(null);
+            }
+        }
+
+        private synchronized void setupConnection() {
+            // 连接服务端
+        }
+
+        private void writeConnectionHeader(IpcStreams streams) {
+            // +---------+---------+---------------+---------------+
+            // | 4 bytes | 1 byte  |     1 byte    |    1 byte     |
+            // +---------+---------+---------------+---------------+
+            // |   hrpc  | version | server class  | auth protocol |
+            // +---------+---------+---------------+---------------+
 
         }
 
@@ -124,6 +184,13 @@ public class Client implements AutoCloseable {
             // 持续读取服务端的RPC响应, 读取一次服务端响应
         }
 
+        private synchronized void markClosed(IOException e) {
+            if (shouldCloseConnection.compareAndSet(false, true)) {
+                this.closeException = e;
+                notifyAll();
+            }
+        }
+
         public void interruptConnectingThread() {
             Thread connectThread = connectionThread.get();
             if (connectThread != null) {
@@ -135,6 +202,11 @@ public class Client implements AutoCloseable {
     public static class ConnectionId {
 
         private InetSocketAddress address;
+        private int maxResponseLength;
+
+        public int getMaxResponseLength() {
+            return maxResponseLength;
+        }
 
         public InetSocketAddress getAddress() {
             return address;
