@@ -14,6 +14,7 @@
         <module>parquet-learn</module>
         <module>data-common</module>
         <module>hadoop-learn</module>
+        <module>flink-learn</module>
     </modules>
 
     <dependencies>
