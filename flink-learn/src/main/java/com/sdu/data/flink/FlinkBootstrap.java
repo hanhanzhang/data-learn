@@ -97,7 +97,7 @@ public class FlinkBootstrap {
         // 计数
         DataStream<String> wordCountStream = sourceStream
                 .keyBy(x -> x)
-                .map(new WordCounterFunction()).setParallelism(2).name("word_counter")
+                .map(new WordCounterFunction()).setParallelism(1).name("word_counter")
                 .map(t -> String.format("字符: %s, 当前计数: %d", t.f0, t.f1));
         // 打印
         wordCountStream.addSink(new PrintSinkFunction<>());
