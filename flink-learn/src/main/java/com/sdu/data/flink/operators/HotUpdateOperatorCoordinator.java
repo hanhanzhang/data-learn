@@ -222,7 +222,9 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
             while (this.running) {
                 try {
                     HotUpdateDataAttachOperatorEvent event = eventQueue.poll();
-                    Preconditions.checkArgument(event != null) ;
+                    if (event == null) {
+                        continue;
+                    }
                     // 注册超时任务
                     PendingOperatorEventRequest request = new PendingOperatorEventRequest(parallelism, event);
                     pendingRequests.put(event.getEventId(), request);
@@ -263,6 +265,9 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
             checkState(subtask);
             synchronized (lock) {
                 gateways[subtask] = gateway;
+                if (isReady()) {
+                    lock.notify();
+                }
             }
         }
 
@@ -290,6 +295,10 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
                 Preconditions.checkArgument(gateways[subtask] != null);
                 gateways[subtask].sendEvent(event);
             }
+        }
+
+        boolean subtaskReady(int subtask) {
+            return gateways[subtask] != null;
         }
 
         private void checkState(int subtask) {

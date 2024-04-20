@@ -2,9 +2,11 @@ package com.sdu.data.common;
 
 import java.util.ServiceLoader;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class JsonUtils {
@@ -27,4 +29,7 @@ public class JsonUtils {
         return MAPPER.writeValueAsString(obj);
     }
 
+    public static <T> T fromJson(String json, TypeReference<T> reference) throws Exception {
+        return MAPPER.readValue(json, reference);
+    }
 }

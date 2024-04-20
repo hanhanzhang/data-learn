@@ -4,12 +4,12 @@ public enum HotConfigType {
 
     FILE() {
         @Override
-        public HotConfigDetector createHotConfigDetector() {
-            return null;
+        public HotConfigDetector createHotConfigDetector(String subscribeTopic) {
+            return HotConfigFileDetector.INSTANCE;
         }
 
     };
 
-    public abstract HotConfigDetector createHotConfigDetector();
+    public abstract HotConfigDetector createHotConfigDetector(String subscribeTopic);
 
 }

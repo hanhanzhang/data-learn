@@ -4,13 +4,15 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 
 import com.sdu.data.flink.operators.config.HotConfigDescriptor;
 import com.sdu.data.flink.operators.functions.HotUpdateFunction;
 
-public class HotUpdateOperatorFactory<IN, OUT, F extends HotUpdateFunction> implements CoordinatedOperatorFactory<OUT> {
+public class HotUpdateOperatorFactory<IN, OUT, F extends HotUpdateFunction>
+        implements CoordinatedOperatorFactory<OUT>, OneInputStreamOperatorFactory<IN, OUT> {
 
     private final HotConfigDescriptor descriptor;
     private final HotUpdateBaseStreamOperator<OUT, F> streamOperator;
@@ -19,6 +21,10 @@ public class HotUpdateOperatorFactory<IN, OUT, F extends HotUpdateFunction> impl
     HotUpdateOperatorFactory(HotConfigDescriptor descriptor, HotUpdateBaseStreamOperator<OUT, F> streamOperator) {
         this.descriptor = descriptor;
         this.streamOperator = streamOperator;
+    }
+
+    public static <IN, OUT, F extends HotUpdateFunction> HotUpdateOperatorFactory<IN, OUT, F> of(HotConfigDescriptor descriptor, HotUpdateBaseStreamOperator<OUT, F> streamOperator) {
+        return new HotUpdateOperatorFactory<>(descriptor, streamOperator);
     }
 
     @SuppressWarnings("unchecked")

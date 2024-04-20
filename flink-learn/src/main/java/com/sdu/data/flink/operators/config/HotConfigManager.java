@@ -19,7 +19,7 @@ public class HotConfigManager {
             synchronized (INSTANCE) {
                 detector = detectors.get(descriptor.configType());
                 if (detector == null) {
-                    detector = descriptor.configType().createHotConfigDetector();
+                    detector = descriptor.configType().createHotConfigDetector(descriptor.subscribeTopic());
                     detector.open();
                     detectors.put(descriptor.configType(), detector);
                 }
