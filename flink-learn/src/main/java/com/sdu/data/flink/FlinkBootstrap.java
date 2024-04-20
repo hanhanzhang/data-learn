@@ -81,6 +81,7 @@ public class FlinkBootstrap {
         private transient Map<String, Integer> wordWeights;
         private Object lock;
         private int subtask;
+        private int totalTasks;
         private long startTimestamp;
 
 //        private transient ValueState<Integer> wordCounter;
@@ -88,6 +89,7 @@ public class FlinkBootstrap {
         @Override
         public void open(Configuration parameters) throws Exception {
             subtask = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+            totalTasks = getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks();
             startTimestamp = System.currentTimeMillis();
 
 //            StateTtlConfig ttlCfg = StateTtlConfig
@@ -128,7 +130,7 @@ public class FlinkBootstrap {
         public void configChanged(String config) throws Exception {
             Map<String, Integer> weights = JsonUtils.fromJson(config, new TypeReference<Map<String, Integer>>() {});
             synchronized (lock) {
-                LOG.info("update word weights: {}", config);
+                LOG.info("Task({}/{}) update word weights: {}", subtask + 1, totalTasks, config);
                 this.wordWeights = weights;
             }
         }

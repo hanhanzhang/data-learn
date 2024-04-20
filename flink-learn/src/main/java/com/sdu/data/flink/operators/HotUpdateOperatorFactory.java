@@ -31,6 +31,7 @@ public class HotUpdateOperatorFactory<IN, OUT, F extends HotUpdateFunction>
     @Override
     public <T extends StreamOperator<OUT>> T createStreamOperator(StreamOperatorParameters<OUT> parameters) {
         OperatorID operatorID = parameters.getStreamConfig().getOperatorID();
+        streamOperator.setOperatorGateway(parameters.getOperatorEventDispatcher().getOperatorEventGateway(operatorID));
         parameters.getOperatorEventDispatcher().registerEventHandler(operatorID, streamOperator);
         streamOperator.setProcessingTimeService(parameters.getProcessingTimeService());
         streamOperator.setup(parameters.getContainingTask(), parameters.getStreamConfig(), parameters.getOutput());

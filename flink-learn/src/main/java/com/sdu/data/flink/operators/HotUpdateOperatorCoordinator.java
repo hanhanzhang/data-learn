@@ -114,19 +114,19 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
         // recovery, need send latest config
         final HotUpdateDataAttachOperatorEvent operatorEvent = lastOperatorEvent.get();
         if (operatorEvent != null && eventQueue.isEmpty()) { // 若是eventQueue不空, 则可以按照队列中配置更新
-            subtaskGateways.sendOperatorEvent(subtask, lastOperatorEvent.get());
+//            subtaskGateways.sendOperatorEvent(subtask, lastOperatorEvent.get());
         }
     }
 
     @Override
     public void executionAttemptFailed(int subtask, int attemptNumber, @Nullable Throwable reason) {
-        LOG.trace("Task({}/{}) failed, attempt: {}", subtask, context.currentParallelism(), attemptNumber, reason);
+        LOG.info("Task({}/{}) failed, attempt: {}", subtask + 1, context.currentParallelism(), attemptNumber, reason);
         subtaskGateways.unregisterSubtaskGateway(subtask);
     }
 
     @Override
     public void executionAttemptReady(int subtask, int attemptNumber, SubtaskGateway gateway) {
-        LOG.info("Task({}/{}) ready, current attempt: {}", subtask, context.currentParallelism(), attemptNumber);
+        LOG.info("Task({}/{}) ready, current attempt: {}", subtask + 1, context.currentParallelism(), attemptNumber);
         subtaskGateways.registerSubtaskGateway(subtask, gateway);
     }
 
@@ -176,7 +176,7 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
 
         public boolean markStatus(int subtask, boolean status) {
             this.statuses[subtask] = status;
-            return Arrays.stream(statuses).anyMatch(s -> s);
+            return Arrays.stream(statuses).allMatch(s -> s != null && s);
         }
     }
 
@@ -225,6 +225,7 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
                     if (event == null) {
                         continue;
                     }
+                    LOG.info("dispatch operator event, id: {}, attach: {}", event.getEventId(), event.getAttachData());
                     // 注册超时任务
                     PendingOperatorEventRequest request = new PendingOperatorEventRequest(parallelism, event);
                     pendingRequests.put(event.getEventId(), request);
