@@ -76,7 +76,7 @@ public class FlinkBootstrap {
 
         private static final Logger LOG = LoggerFactory.getLogger(WordCounterFunction.class);
 
-        private static final String STATE_NAME = "@word-counter@";
+//        private static final String STATE_NAME = "@word-counter@";
 
         private transient Map<String, Integer> wordWeights;
         private Object lock;
@@ -118,6 +118,9 @@ public class FlinkBootstrap {
 
             int weight = 1;
             synchronized (lock) {
+                if (wordWeights == null) {
+                    lock.wait();
+                }
                 weight = wordWeights.getOrDefault(value, 1);
             }
 //            Integer cnt = wordCounter.value();
@@ -132,6 +135,7 @@ public class FlinkBootstrap {
             synchronized (lock) {
                 LOG.info("Task({}/{}) update word weights: {}", subtask + 1, totalTasks, config);
                 this.wordWeights = weights;
+                lock.notify();
             }
         }
     }

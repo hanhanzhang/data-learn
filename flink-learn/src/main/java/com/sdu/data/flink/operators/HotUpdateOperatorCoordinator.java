@@ -1,8 +1,11 @@
 package com.sdu.data.flink.operators;
 
+import static java.lang.String.format;
+
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -13,11 +16,15 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import javax.annotation.Nullable;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.shaded.curator5.com.google.common.collect.Sets;
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
@@ -39,7 +46,8 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
     private transient SubtaskGateways subtaskGateways;
 
     // 热配变更请求
-    private transient LinkedBlockingQueue<HotUpdateDataAttachOperatorEvent> eventQueue;
+    private transient Set<Integer> defaultTargetTasks;
+    private transient LinkedBlockingQueue<HotUpdateDataRequest> requestQueue;
     private transient OperatorEventSender eventSender;
     private transient AtomicReference<HotUpdateDataAttachOperatorEvent> lastOperatorEvent;
 
@@ -56,18 +64,22 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
     @Override
     public void start() throws Exception {
         subtaskGateways = new SubtaskGateways(context.currentParallelism());
-
+        defaultTargetTasks = Sets.newHashSet(
+                IntStream.range(0, context.currentParallelism())
+                        .boxed()
+                        .collect(Collectors.toList())
+        );
         timer = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setNameFormat("hot-config-update-timeout-thread-%d").build());
         timeoutFutures = new ConcurrentHashMap<>();
         pendingRequests = new ConcurrentHashMap<>();
         lastOperatorEvent = new AtomicReference<>(null);
-        eventQueue = new LinkedBlockingQueue<>();
-        eventSender = new OperatorEventSender(context.currentParallelism(), eventQueue, this::failJob);
+        requestQueue = new LinkedBlockingQueue<>();
+        eventSender = new OperatorEventSender(requestQueue, this::failJob);
         eventSender.start();
 
         // 注册配置
         String newConfig = HotConfigManager.INSTANCE.register(descriptor, this);
-        eventQueue.put(new HotUpdateDataAttachOperatorEvent(newConfig));
+        requestQueue.put(new HotUpdateDataRequest(defaultTargetTasks, new HotUpdateDataAttachOperatorEvent(newConfig)));
     }
 
     @Override
@@ -86,7 +98,7 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
                 PendingOperatorEventRequest pendingRequest = pendingRequests.get(acknowledgeOperatorEvent.getEventId());
                 boolean success = pendingRequest.markStatus(subtask, true);
                 if (success) {
-                    LOG.info("hot config update success, config: {}", pendingRequest.getOperatorEvent().getAttachData());
+                    LOG.info("Task({}) update config success, config: {}", pendingRequest.getTasks(), pendingRequest.getOperatorEvent().getAttachData());
                     pendingRequests.remove(acknowledgeOperatorEvent.getEventId());
                     timeoutFutures.remove(acknowledgeOperatorEvent.getEventId()).cancel(true);
                 }
@@ -113,8 +125,16 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
     public void subtaskReset(int subtask, long checkpointId) {
         // recovery, need send latest config
         final HotUpdateDataAttachOperatorEvent operatorEvent = lastOperatorEvent.get();
-        if (operatorEvent != null && eventQueue.isEmpty()) { // 若是eventQueue不空, 则可以按照队列中配置更新
-//            subtaskGateways.sendOperatorEvent(subtask, lastOperatorEvent.get());
+        if (operatorEvent != null && requestQueue.isEmpty()) { // 若是eventQueue不空, 则可以按照队列中配置更新
+            boolean success = requestQueue.offer(
+                    new HotUpdateDataRequest(
+                            Sets.newHashSet(subtask),
+                            new HotUpdateDataAttachOperatorEvent(lastOperatorEvent.get().getAttachData()
+                            )
+                    ));
+            if (!success) {
+                this.failJob(new RuntimeException(format("Task(%d/%d) failed notify config", subtask + 1, context.currentParallelism())));
+            }
         }
     }
 
@@ -137,7 +157,7 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
     @Override
     public void notifyConfig(String oldConfig, String newConfig) {
         try {
-            eventQueue.put(new HotUpdateDataAttachOperatorEvent(newConfig));
+            requestQueue.put(new HotUpdateDataRequest(defaultTargetTasks, new HotUpdateDataAttachOperatorEvent(newConfig)));
         } catch (Exception e) {
             this.failJob(new RuntimeException("failed buffer hot config changed event."));
         }
@@ -160,14 +180,42 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
 
     }
 
+    private static final class HotUpdateDataRequest {
+
+        private final long createTimestamp;
+        private final Set<Integer> targetTasks;
+        private final HotUpdateDataAttachOperatorEvent event;
+
+        HotUpdateDataRequest(Set<Integer> targetTasks, HotUpdateDataAttachOperatorEvent event) {
+            this.createTimestamp = System.currentTimeMillis();
+            this.targetTasks = targetTasks;
+            this.event = event;
+        }
+
+        public long getCreateTimestamp() {
+            return createTimestamp;
+        }
+
+        public Set<Integer> getTargetTasks() {
+            return targetTasks;
+        }
+
+        public HotUpdateDataAttachOperatorEvent getEvent() {
+            return event;
+        }
+
+    }
+
     private static final class PendingOperatorEventRequest {
 
         private final HotUpdateDataAttachOperatorEvent operatorEvent;
+        private final Set<Integer> tasks;
         private final Boolean[] statuses;
 
-        PendingOperatorEventRequest(int parallelism, HotUpdateDataAttachOperatorEvent operatorEvent) {
+        PendingOperatorEventRequest(Set<Integer> tasks, HotUpdateDataAttachOperatorEvent operatorEvent) {
+            this.tasks = tasks;
             this.operatorEvent = operatorEvent;
-            this.statuses = new Boolean[parallelism];
+            this.statuses = new Boolean[tasks.size()];
         }
 
         public HotUpdateDataAttachOperatorEvent getOperatorEvent() {
@@ -177,6 +225,10 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
         public boolean markStatus(int subtask, boolean status) {
             this.statuses[subtask] = status;
             return Arrays.stream(statuses).allMatch(s -> s != null && s);
+        }
+
+        public String getTasks() {
+            return StringUtils.join(tasks, ',');
         }
     }
 
@@ -206,14 +258,12 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
     private final class OperatorEventSender extends Thread {
 
         private volatile boolean running;
-        private final int parallelism;
-        private final Queue<HotUpdateDataAttachOperatorEvent> eventQueue;
+        private final Queue<HotUpdateDataRequest> requestQueue;
         private final ExceptionHandler exceptionHandler;
 
-        OperatorEventSender(int parallelism, Queue<HotUpdateDataAttachOperatorEvent> eventQueue, ExceptionHandler exceptionHandler) {
+        OperatorEventSender(Queue<HotUpdateDataRequest> requestQueue, ExceptionHandler exceptionHandler) {
             this.running = true;
-            this.parallelism = parallelism;
-            this.eventQueue = eventQueue;
+            this.requestQueue = requestQueue;
             this.exceptionHandler = exceptionHandler;
         }
 
@@ -221,21 +271,23 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
         public void run() {
             while (this.running) {
                 try {
-                    HotUpdateDataAttachOperatorEvent event = eventQueue.poll();
-                    if (event == null) {
+                    HotUpdateDataRequest request = requestQueue.poll();
+                    if (request == null) {
                         continue;
                     }
+                    HotUpdateDataAttachOperatorEvent event = request.getEvent();
+                    Set<Integer> targetTasks = request.getTargetTasks();
                     LOG.info("dispatch operator event, id: {}, attach: {}", event.getEventId(), event.getAttachData());
                     // 注册超时任务
-                    PendingOperatorEventRequest request = new PendingOperatorEventRequest(parallelism, event);
-                    pendingRequests.put(event.getEventId(), request);
+                    PendingOperatorEventRequest pendingRequest = new PendingOperatorEventRequest(targetTasks, event);
+                    pendingRequests.put(event.getEventId(), pendingRequest);
                     ScheduledFuture<?> timeoutFuture = timer.schedule(
-                            new TimeoutTask(request, exceptionHandler),
+                            new TimeoutTask(pendingRequest, exceptionHandler),
                             descriptor.updateTimeoutMills(),
                             TimeUnit.MILLISECONDS);
                     timeoutFutures.put(event.getEventId(), timeoutFuture);
                     // 发生变更请求
-                    subtaskGateways.sendOperatorEvent(event);
+                    subtaskGateways.sendOperatorEvent(event, targetTasks);
                     lastOperatorEvent.set(event);
                 } catch (Exception e) {
                     exceptionHandler.occurException(e);
@@ -279,27 +331,17 @@ public class HotUpdateOperatorCoordinator implements OperatorCoordinator, HotCon
             }
         }
 
-        void sendOperatorEvent(OperatorEvent event) throws Exception {
+        void sendOperatorEvent(OperatorEvent event, Set<Integer> targetTasks) throws Exception {
             synchronized (lock) {
                 if (!isReady()) {
                     lock.wait();
                 }
-                for (SubtaskGateway gateway : gateways) {
+                for (int subtask : targetTasks) {
+                    SubtaskGateway gateway = gateways[subtask];
+                    Preconditions.checkArgument(gateway != null);
                     gateway.sendEvent(event);
                 }
             }
-        }
-
-        void sendOperatorEvent(int subtask, OperatorEvent event) {
-            checkState(subtask);
-            synchronized (lock) {
-                Preconditions.checkArgument(gateways[subtask] != null);
-                gateways[subtask].sendEvent(event);
-            }
-        }
-
-        boolean subtaskReady(int subtask) {
-            return gateways[subtask] != null;
         }
 
         private void checkState(int subtask) {
