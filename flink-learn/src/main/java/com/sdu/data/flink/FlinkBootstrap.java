@@ -1,10 +1,11 @@
 package com.sdu.data.flink;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.sdu.data.common.JsonUtils;
+import com.sdu.data.flink.operators.DataStreams;
+import com.sdu.data.flink.operators.config.HotConfigDescriptor;
+import com.sdu.data.flink.operators.config.HotConfigType;
+import com.sdu.data.flink.operators.functions.HotUpdateRichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.CheckpointingMode;
@@ -16,12 +17,10 @@ import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.sdu.data.common.JsonUtils;
-import com.sdu.data.flink.operators.DataStreams;
-import com.sdu.data.flink.operators.config.HotConfigDescriptor;
-import com.sdu.data.flink.operators.config.HotConfigType;
-import com.sdu.data.flink.operators.functions.HotUpdateRichMapFunction;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 public class FlinkBootstrap {
 
