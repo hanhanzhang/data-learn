@@ -1,11 +1,10 @@
 package com.sdu.data.flink;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.sdu.data.common.JsonUtils;
-import com.sdu.data.flink.operators.DataStreams;
-import com.sdu.data.flink.operators.config.HotConfigDescriptor;
-import com.sdu.data.flink.operators.config.HotConfigType;
-import com.sdu.data.flink.operators.functions.HotUpdateRichMapFunction;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.CheckpointingMode;
@@ -17,31 +16,13 @@ import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.sdu.data.common.JsonUtils;
+import com.sdu.data.flink.operators.DataStreams;
+import com.sdu.data.flink.operators.config.files.HotConfigFileDescriptor;
+import com.sdu.data.flink.operators.functions.HotUpdateRichMapFunction;
 
 public class FlinkBootstrap {
-
-    public static class WordWeightHotConfigDescriptor implements HotConfigDescriptor {
-
-        @Override
-        public String subscribeTopic() {
-            return "/Users/hanhan.zhang/Downloads/words.txt";
-        }
-
-        @Override
-        public HotConfigType configType() {
-            return HotConfigType.FILE;
-        }
-
-        @Override
-        public long updateTimeoutMills() {
-            return 2 * 60 * 1000L;
-        }
-
-    }
 
     public static class WordSourceFunction implements ParallelSourceFunction<String> {
 
@@ -158,8 +139,13 @@ public class FlinkBootstrap {
 
         // 计数
 //        KeyedStream<String, String> wordCountStream = sourceStream.keyBy(x -> x);
+        HotConfigFileDescriptor fileDescriptor = new HotConfigFileDescriptor(
+                "/Users/hanhan.zhang/Downloads/words.txt",
+                1_000L,
+                2 * 60 * 1000L
+        );
         DataStreams
-                .mapWithHotConfigDescriptor(sourceStream, new WordWeightHotConfigDescriptor(), new WordCounterFunction())
+                .mapWithHotConfigDescriptor(sourceStream, fileDescriptor, new WordCounterFunction())
                 .name("word_counter")
                 .setParallelism(2)
                 .map(t -> String.format("字符: %s, 当前计数: %d", t.f0, t.f1))

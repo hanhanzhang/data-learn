@@ -4,8 +4,6 @@ import java.io.Serializable;
 
 public interface HotConfigDescriptor extends Serializable {
 
-    String subscribeTopic();
-
     HotConfigType configType();
 
     // 更新超时时间, 单位: ms
