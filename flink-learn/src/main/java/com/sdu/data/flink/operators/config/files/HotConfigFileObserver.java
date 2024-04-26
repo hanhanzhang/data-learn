@@ -13,8 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.sdu.data.flink.operators.config.HotConfigDescriptor;
-import com.sdu.data.flink.operators.config.HotConfigObserver;
 import com.sdu.data.flink.operators.config.HotConfigListener;
+import com.sdu.data.flink.operators.config.HotConfigObserver;
 
 @ThreadSafe
 public class HotConfigFileObserver implements HotConfigObserver {
@@ -27,6 +27,10 @@ public class HotConfigFileObserver implements HotConfigObserver {
 
     private final Object lock = new Object();
     private transient boolean opened = false;
+
+    // FileAlterationMonitor是目录级监控器
+    // HotConfigFileAlterationListener是目录级监听器, 负责监控目录下文件的变化
+    // HotConfigListener是文件级监听器
     private transient FileAlterationMonitor monitor;
     private transient HotConfigFileAlterationListener alterationListener;
     private transient Map<String, FileAlterationObserver> fileObservers;
@@ -62,19 +66,23 @@ public class HotConfigFileObserver implements HotConfigObserver {
     public String register(HotConfigDescriptor descriptor, HotConfigListener listener) {
         Preconditions.checkArgument(descriptor instanceof HotConfigFileDescriptor);
         HotConfigFileDescriptor fileDescriptor = (HotConfigFileDescriptor) descriptor;
+        File observerFile = new File(fileDescriptor.getFilePath());
+        Preconditions.checkArgument(observerFile.getParent() != null);
+        String parentPath = observerFile.getParent();
         synchronized (lock) {
             try {
-                FileAlterationObserver observer = fileObservers.get(fileDescriptor.getFilePath());
+                FileAlterationObserver observer = fileObservers.get(parentPath);
                 if (observer != null) {
-                    LOG.info("file observer already registered, path: {}", fileDescriptor.getFilePath());
-                    return alterationListener.registerListener(fileDescriptor.getFilePath(), listener);
+                    LOG.info("file directory observer already registered, path: {}", parentPath);
+                    return alterationListener.registerListener(parentPath, fileDescriptor.getFilePath(), listener);
                 }
-                observer = new FileAlterationObserver(new File(fileDescriptor.getFilePath()));
+                // NOTE: 监控父目录, 否则无法检测到文件内容变化
+                observer = new FileAlterationObserver(observerFile.getParentFile());
                 observer.initialize();
-                fileObservers.put(fileDescriptor.getFilePath(), observer);
+                fileObservers.put(parentPath, observer);
                 monitor.addObserver(observer);
                 observer.addListener(alterationListener);
-                return alterationListener.registerListener(fileDescriptor.getFilePath(), listener);
+                return alterationListener.registerListener(parentPath, fileDescriptor.getFilePath(), listener);
             } catch (Exception e) {
                 throw new RuntimeException("failed register file listener", e);
             }
@@ -85,14 +93,18 @@ public class HotConfigFileObserver implements HotConfigObserver {
     public void unregister(HotConfigDescriptor descriptor, HotConfigListener listener) {
         Preconditions.checkArgument(descriptor instanceof HotConfigFileDescriptor);
         HotConfigFileDescriptor fileDescriptor = (HotConfigFileDescriptor) descriptor;
-        boolean hasListeners = alterationListener.unregisterListener(fileDescriptor.getFilePath(), listener);
-        if (!hasListeners) {
-            synchronized (lock) {
-                FileAlterationObserver observer = fileObservers.remove(fileDescriptor.getFilePath());
-                if (observer != null) {
-                    monitor.removeObserver(observer);
-                }
-            }
+        File observerFile = new File(fileDescriptor.getFilePath());
+        String parentPath = observerFile.getParent();
+        synchronized (lock) {
+            alterationListener.unregisterListener(
+                    parentPath,
+                    fileDescriptor.getFilePath(),
+                    listener,
+                    () -> {
+                        LOG.info("remove observer, directory: {}", parentPath);
+                        FileAlterationObserver observer = fileObservers.remove(parentPath);
+                        monitor.removeObserver(observer);
+                    });
         }
     }
 

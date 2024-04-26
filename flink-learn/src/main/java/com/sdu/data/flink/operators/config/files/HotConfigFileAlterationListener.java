@@ -18,11 +18,13 @@ public class HotConfigFileAlterationListener extends FileAlterationListenerAdapt
 
     private final Object lock = new Object();
     private final Map<String, String> fileContents;
+    private final Map<String, Integer> listenerNumbers;
     private final Map<String, List<HotConfigListener>> fileListeners;
 
     public HotConfigFileAlterationListener() {
         this.fileContents = new HashMap<>();
         this.fileListeners = new HashMap<>();
+        this.listenerNumbers = new HashMap<>();
     }
 
     @Override
@@ -30,6 +32,9 @@ public class HotConfigFileAlterationListener extends FileAlterationListenerAdapt
         synchronized (lock) {
             String path = file.getPath();
             List<HotConfigListener> listeners = fileListeners.get(path);
+            if (listeners == null || listeners.isEmpty()) {
+                return;
+            }
             try {
                 String data = HotConfigFileDescriptor.readConfig(path);
                 String oldData = fileContents.put(path, data);
@@ -40,26 +45,26 @@ public class HotConfigFileAlterationListener extends FileAlterationListenerAdapt
         }
     }
 
-    public String registerListener(String file, HotConfigListener listener) {
+    public String registerListener(String parent, String file, HotConfigListener listener) {
         synchronized (lock) {
             List<HotConfigListener> listeners = fileListeners.computeIfAbsent(file, new FileRegisterFunction());
             listeners.add(listener);
+            // 引用计数
+            listenerNumbers.compute(parent, (k, cnt) -> cnt == null ? 1 : cnt + 1);
             return fileContents.get(file);
         }
     }
 
-    public boolean unregisterListener(String file, HotConfigListener listener) {
+    public void unregisterListener(String parent, String file, HotConfigListener listener, Runnable action) {
         synchronized (lock) {
-            List<HotConfigListener> listeners = fileListeners.get(file);
-            if (listeners == null) {
-                return false;
+            fileListeners.computeIfPresent(file, (k, listeners) -> {
+                listeners.remove(listener);
+                return listeners.isEmpty() ? null : listeners;
+            });
+            Integer ret = listenerNumbers.computeIfPresent(parent, (k, cnt) -> cnt > 1 ? cnt - 1 : null);
+            if (ret == null) {
+                action.run();
             }
-            listeners.remove(listener);
-            if (listeners.isEmpty()) {
-                fileListeners.remove(file);
-                return true;
-            }
-            return false;
         }
     }
 
