@@ -13,6 +13,7 @@
 
     <properties>
         <flink.version>1.19.0</flink.version>
+        <kafka.version>3.7.0</kafka.version>
     </properties>
 
     <dependencies>
@@ -26,6 +27,12 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-streaming-java</artifactId>
             <version>${flink.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>${kafka.version}</version>
         </dependency>
     </dependencies>
 

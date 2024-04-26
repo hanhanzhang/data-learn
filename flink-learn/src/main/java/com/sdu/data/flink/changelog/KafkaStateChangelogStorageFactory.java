@@ -10,6 +10,11 @@ import org.apache.flink.runtime.state.changelog.StateChangelogStorageView;
 
 import java.io.IOException;
 
+// @see TaskManagerServices#fromConfiguration
+//         |
+//         +--> TaskExecutorStateChangelogStoragesManager#stateChangelogStorageForJob
+//               |
+//               +--> StateChangelogStorageLoader#load
 public class KafkaStateChangelogStorageFactory implements StateChangelogStorageFactory {
 
     public static final String IDENTIFIER = "kafka";
