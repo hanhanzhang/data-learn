@@ -1,6 +1,6 @@
 package com.sdu.data.flink.operators.config;
 
-public interface HotConfigDetector {
+public interface HotConfigObserver {
 
     void open(HotConfigDescriptor descriptor);
 

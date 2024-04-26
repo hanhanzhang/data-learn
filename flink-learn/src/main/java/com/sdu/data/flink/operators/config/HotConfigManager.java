@@ -7,14 +7,14 @@ public class HotConfigManager {
 
     public static final HotConfigManager INSTANCE = new HotConfigManager();
 
-    private final Map<HotConfigType, HotConfigDetector> detectors;
+    private final Map<HotConfigType, HotConfigObserver> detectors;
 
     private HotConfigManager() {
         detectors = new HashMap<>();
     }
 
     public String register(HotConfigDescriptor descriptor, HotConfigListener listener) {
-        HotConfigDetector detector = detectors.get(descriptor.configType());
+        HotConfigObserver detector = detectors.get(descriptor.configType());
         if (detector == null) {
             synchronized (INSTANCE) {
                 detector = detectors.get(descriptor.configType());
@@ -29,7 +29,7 @@ public class HotConfigManager {
     }
 
     public void unregister(HotConfigDescriptor descriptor, HotConfigListener listener) {
-        HotConfigDetector detector = detectors.get(descriptor.configType());
+        HotConfigObserver detector = detectors.get(descriptor.configType());
         if (detector == null) {
             return;
         }

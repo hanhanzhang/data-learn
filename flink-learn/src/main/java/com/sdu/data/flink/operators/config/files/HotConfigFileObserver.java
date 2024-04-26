@@ -13,15 +13,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.sdu.data.flink.operators.config.HotConfigDescriptor;
-import com.sdu.data.flink.operators.config.HotConfigDetector;
+import com.sdu.data.flink.operators.config.HotConfigObserver;
 import com.sdu.data.flink.operators.config.HotConfigListener;
 
 @ThreadSafe
-public class HotConfigFileDetector implements HotConfigDetector {
+public class HotConfigFileObserver implements HotConfigObserver {
 
-    private static final Logger LOG = LoggerFactory.getLogger(HotConfigFileDetector.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HotConfigFileObserver.class);
 
-    public static final HotConfigFileDetector INSTANCE = new HotConfigFileDetector();
+    public static final HotConfigFileObserver INSTANCE = new HotConfigFileObserver();
 
     // todo: file data read base FileSystem
 
