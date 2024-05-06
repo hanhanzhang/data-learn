@@ -2,17 +2,12 @@ package com.sdu.data.flink;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.PrintSinkFunction;
-import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,35 +17,8 @@ import com.sdu.data.flink.operators.DataStreams;
 import com.sdu.data.flink.operators.config.files.HotConfigFileDescriptor;
 import com.sdu.data.flink.operators.functions.HotUpdateRichMapFunction;
 
-public class FlinkBootstrap {
+public class FlinkBootstrap implements Bootstrap {
 
-    public static class WordSourceFunction implements ParallelSourceFunction<String> {
-
-        private boolean running = true;
-
-        @Override
-        public void run(SourceContext<String> ctx) throws Exception {
-            Random random = new Random();
-            while (running) {
-                ctx.collect(createRandomChineseCharacters(random));
-                TimeUnit.MILLISECONDS.sleep(1);
-            }
-        }
-
-        @Override
-        public void cancel() {
-            this.running = false;
-        }
-
-        private static String createRandomChineseCharacters(Random random) {
-            // Unicode范围：4e00-9fa5 是中文字符的范围
-            int unicodeStart = 0x4e00;
-            int unicodeEnd = 0x9fa5;
-            int code =  unicodeStart + random.nextInt(unicodeEnd - unicodeStart + 1);
-            return new String(Character.toChars(code));
-        }
-
-    }
 
     public static class WordCounterFunction extends HotUpdateRichMapFunction<String, Tuple2<String, Integer>> {
 
@@ -59,7 +27,7 @@ public class FlinkBootstrap {
 //        private static final String STATE_NAME = "@word-counter@";
 
         private transient Map<String, Integer> wordWeights;
-        private Object lock;
+        private final Object lock = new Object();
         private int subtask;
         private int totalTasks;
         private long startTimestamp;
@@ -83,7 +51,6 @@ public class FlinkBootstrap {
 //            wordCounter = getRuntimeContext().getState(descriptor);
 
             wordWeights = new HashMap<>();
-            lock = new Object();
         }
 
         @Override
@@ -121,21 +88,9 @@ public class FlinkBootstrap {
     }
 
     public static void main(String[] args) throws Exception {
-        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.disableOperatorChaining();
+        StreamExecutionEnvironment env = Bootstrap.getDefaultStreamExecutionEnv();
 
-        // checkpoint
-        CheckpointConfig checkpointConfig = env.getCheckpointConfig();
-        checkpointConfig.setCheckpointInterval(3 * 60 * 1000L);
-        checkpointConfig.setCheckpointTimeout(5 * 60 * 1000L);
-        checkpointConfig.setMaxConcurrentCheckpoints(1);
-        checkpointConfig.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
-
-        //
-        DataStream<String> sourceStream = env
-                .addSource(new WordSourceFunction())
-                .name("word_source")
-                .setParallelism(2);
+        DataStream<String> sourceStream = Bootstrap.wordSourceStream(env, 2);
 
         // 计数
 //        KeyedStream<String, String> wordCountStream = sourceStream.keyBy(x -> x);

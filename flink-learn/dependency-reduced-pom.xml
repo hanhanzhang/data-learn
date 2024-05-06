@@ -85,5 +85,6 @@
   </dependencies>
   <properties>
     <flink.version>1.19.0</flink.version>
+    <kafka.version>3.7.0</kafka.version>
   </properties>
 </project>
