@@ -38,8 +38,8 @@ public class FlinkDynamicVariablesBootstrap implements Bootstrap {
             this.filterWords = new HashMap<>();
             this.timestamp = System.currentTimeMillis();
             String value = config.getDynamicVariable(KEY, "");
-            if (!value.isEmpty()) {
-                LOG.info("Task started, default dynamic variable : {} = {}", KEY, value);
+            if (value == null || value.isEmpty()) {
+                LOG.info("Task started, initialize dynamic variable : {} = {}", KEY, value);
             }
         }
 
@@ -62,8 +62,8 @@ public class FlinkDynamicVariablesBootstrap implements Bootstrap {
                 return filters;
             }
             filterWords.clear();
-            LOG.info("receive dynamic variable, key: {}, value: {}", KEY, value);
-            LOG.info("total dynamic variables: {}", JsonUtils.toJson(variables));
+            LOG.info("dynamic variable, key: {}, value: {}", KEY, value);
+            LOG.info("dynamic variables: {}", JsonUtils.toJson(variables));
             filters = Sets.newHashSet(value.split(","));
             filterWords.put(value, filters);
             return filters;
