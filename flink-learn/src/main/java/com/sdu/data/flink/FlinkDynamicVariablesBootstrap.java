@@ -37,10 +37,10 @@ public class FlinkDynamicVariablesBootstrap implements Bootstrap {
             this.config = getRuntimeContext().getDynamicConfig();
             this.filterWords = new HashMap<>();
             this.timestamp = System.currentTimeMillis();
-            LOG.info(
-                    "Task started, default dynamic variable : {} = {}",
-                    KEY,
-                    config.getDynamicVariable(KEY, ""));
+            String value = config.getDynamicVariable(KEY, "");
+            if (!value.isEmpty()) {
+                LOG.info("Task started, default dynamic variable : {} = {}", KEY, value);
+            }
         }
 
         @Override
