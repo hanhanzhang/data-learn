@@ -1,5 +1,6 @@
 package com.sdu.data.flink;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -59,11 +60,13 @@ public class FlinkVariablesBootstrap implements Bootstrap {
 
         private static Set<String> getAndUpdate(
                 String taskName, Map<String, Set<String>> filterWords, String value, Map<String, String> variables) throws Exception {
+            if (value == null || value.isEmpty()) {
+                return Collections.emptySet();
+            }
             Set<String> filters = filterWords.get(value);
             if (filters != null) {
                 return filters;
             }
-            filterWords.clear();
             LOG.info("task({}) reload dynamic variable, key: {}, value: {}", taskName, KEY, value);
             LOG.info("task({}) obtain dynamic variables: {}", taskName, JsonUtils.toJson(variables));
             filters = Sets.newHashSet(value.split(","));
