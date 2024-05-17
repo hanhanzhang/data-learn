@@ -1,6 +1,9 @@
 package com.sdu.data.flink;
 
-import com.sdu.data.common.JsonUtils;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.flink.api.common.DynamicConfig;
 import org.apache.flink.api.common.functions.RichFilterFunction;
 import org.apache.flink.configuration.Configuration;
@@ -11,12 +14,10 @@ import org.apache.flink.streaming.api.functions.sink.PrintSinkFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import com.sdu.data.common.JsonUtils;
 
 /** Dynamic variables bootstrap. */
-public class FlinkDynamicVariablesBootstrap implements Bootstrap {
+public class FlinkVariablesBootstrap implements Bootstrap {
 
     public static class WordFilterWithDynamicVariablesFunction extends RichFilterFunction<String> {
 
@@ -27,6 +28,7 @@ public class FlinkDynamicVariablesBootstrap implements Bootstrap {
 
         private transient long timestamp = 0;
         private transient int subtask;
+        private transient String taskName;
         private transient DynamicConfig config;
         private transient Map<String, Set<String>> filterWords;
 
@@ -34,36 +36,36 @@ public class FlinkDynamicVariablesBootstrap implements Bootstrap {
         public void open(Configuration parameters) throws Exception {
             super.open(parameters);
             this.subtask = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+            this.taskName = getRuntimeContext().getTaskInfo().getTaskNameWithSubtasks();
             this.config = getRuntimeContext().getDynamicConfig();
             this.filterWords = new HashMap<>();
             this.timestamp = System.currentTimeMillis();
             String value = config.getDynamicVariable(KEY, "");
-            if (value == null || value.isEmpty()) {
-                LOG.info("Task started, initialize dynamic variable : {} = {}", KEY, value);
+            if (value != null && !value.isEmpty()) {
+                LOG.info("task({}) initialize dynamic variable : {} = {}", taskName, KEY, value);
             }
         }
 
         @Override
         public boolean filter(String word) throws Exception {
-            if (subtask == 0 && (System.currentTimeMillis() - timestamp) >= 2 * 60 * 1000L) {
-                throw new RuntimeException("restart again.");
-            }
+//            if (subtask == 0 && (System.currentTimeMillis() - timestamp) >= 2 * 60 * 1000L) {
+//                throw new RuntimeException("restart again.");
+//            }
             String value = config.getDynamicVariable(KEY, "");
             Set<String> filters =
-                    getAndRemove(filterWords, value, config.getTotalDynamicVariables());
+                    getAndUpdate(taskName, filterWords, value, config.getTotalDynamicVariables());
             return !filters.contains(word);
         }
 
-        private static Set<String> getAndRemove(
-                Map<String, Set<String>> filterWords, String value, Map<String, String> variables)
-                throws Exception {
+        private static Set<String> getAndUpdate(
+                String taskName, Map<String, Set<String>> filterWords, String value, Map<String, String> variables) throws Exception {
             Set<String> filters = filterWords.get(value);
             if (filters != null) {
                 return filters;
             }
             filterWords.clear();
-            LOG.info("dynamic variable, key: {}, value: {}", KEY, value);
-            LOG.info("dynamic variables: {}", JsonUtils.toJson(variables));
+            LOG.info("task({}) reload dynamic variable, key: {}, value: {}", taskName, KEY, value);
+            LOG.info("task({}) obtain dynamic variables: {}", taskName, JsonUtils.toJson(variables));
             filters = Sets.newHashSet(value.split(","));
             filterWords.put(value, filters);
             return filters;
